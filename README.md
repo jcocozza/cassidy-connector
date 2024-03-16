@@ -13,4 +13,4 @@ The ultimate goal is to allow users to entirely disconnect their data from exter
 The first step in the project is to get some basic data connections to allow users to import their data.
 This will also give us a better feel of the structure and shape of data that we are dealing with.
 
-
+At least in spirit, this portion will be modeled after [stravalib](https://github.com/stravalib/stravalib)
