@@ -1,29 +1,19 @@
 package main
 
 import (
-    "encoding/json"
-    "net/http"
+	"fmt"
+
+	"github.com/jcocozza/cassidy-connector/strava/auth"
 )
 
-type Book struct {
-    Title  string `json:"title"`
-    Author string `json:"author"`
-}
-
 func main() {
-    http.HandleFunc("/", ShowBooks)
-    http.ListenAndServe(":8080", nil)
-}
+    auth.InitialAuthorization()
 
-func ShowBooks(w http.ResponseWriter, r *http.Request) {
-    book := Book{"Building Web Apps with Go", "Jeremy Saenz"}
+    token, err := auth.GetAccessTokenFromAuthorizationCode("*** THE TOKEN FROM BROWSER HERE ***")
 
-    js, err := json.Marshal(book)
     if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
+        panic(err)
     }
 
-    w.Header().Set("Content-Type", "application/json")
-    w.Write(js)
+    fmt.Println(token)
 }
