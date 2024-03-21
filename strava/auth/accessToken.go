@@ -44,21 +44,18 @@ func makePayloadRefreshToken(refreshToken string) ([]byte, error) {
 //
 // The user must already have granted access to the application to use this.
 // (Otherwise, must authenticate first)
-func GetAccessTokenFromRefresh(refreshToken string) (*GetAccessTokenResponse, error) {
+func RefreshAccessToken(refreshToken string) (*GetAccessTokenResponse, error) {
 	// Create the data
 	payload, err := makePayloadRefreshToken(refreshToken)
 	if err != nil {
 		return nil, err
 	}
-
 	// Create a request
 	req, err1 := http.NewRequest("POST", AuthorizationUrl, bytes.NewBuffer(payload))
 	if err1 != nil {
 		return nil, err1
 	}
-
 	req.Header.Set("Content-Type", "application/json")
-
 	// Make the request
 	client := &http.Client{}
 	resp, err2 := client.Do(req)
@@ -66,19 +63,16 @@ func GetAccessTokenFromRefresh(refreshToken string) (*GetAccessTokenResponse, er
 		return nil, err2
 	}
 	defer resp.Body.Close()
-
 	// Read response body
 	body, err3 := io.ReadAll(resp.Body)
 	if err3 != nil {
 		return nil, err3
 	}
-
 	// Load response into struct
 	var response GetAccessTokenResponse
 	err4 := json.Unmarshal(body, &response)
 	if err4 != nil {
 		return nil, err4
 	}
-
 	return &response, nil
 }

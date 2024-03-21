@@ -21,7 +21,7 @@ func GenerateApprovalUrl() string {
 	return fmt.Sprintf(ApprovalUrlFormat, ClientId, responseType, redirectUri, approvalPrompt, scope)
 }
 // open the approval url in browser
-func InitialAuthorization() {
+func InitialAuthorizationDirect() {
 	approvalUrl := GenerateApprovalUrl()
 	openURL(approvalUrl)
 }
@@ -49,7 +49,6 @@ func GetAccessTokenFromAuthorizationCode(authorizationCode string) (*GetAccessTo
 	if err3 != nil {
 		return nil, err3
 	}
-	fmt.Println(string(body))
 	// Load response into struct
 	var token GetAccessTokenResponse
 	err4 := json.Unmarshal(body, &token)
@@ -58,5 +57,3 @@ func GetAccessTokenFromAuthorizationCode(authorizationCode string) (*GetAccessTo
 	}
 	return &token, nil
 }
-
-
