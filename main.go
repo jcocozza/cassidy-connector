@@ -1,15 +1,16 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 
-	"github.com/jcocozza/cassidy-connector/strava/auth"
-    "github.com/jcocozza/cassidy-connector/strava/api"
+//	"github.com/jcocozza/cassidy-connector/strava/auth"
+    //"github.com/jcocozza/cassidy-connector/strava/api"
 )
 
 func main() {
     //auth.InitialAuthorizationDirect()
-    token, err := auth.GetAccessTokenFromAuthorizationCode("*** TOKEN FROM BROWER HERE ***")
+    /*
+    token, err := auth.GetAccessTokenFromAuthorizationCode("*** TOKEN FROM BROWSER HERE ***")
     if err != nil {
         panic(err)
     }
@@ -22,4 +23,5 @@ func main() {
     for _, p := range pages {
         fmt.Println(string(p))
     }
+    */
 }

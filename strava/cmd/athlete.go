@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/jcocozza/cassidy-connector/strava/api"
 	"github.com/spf13/cobra"
 )
 
@@ -11,7 +10,8 @@ var getAthlete = &cobra.Command{
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		accessToken := args[0]
-		api.GetAthlete(accessToken)
+		stravaApp := createApp()
+		stravaApp.GetAthlete(accessToken)
 	},
 }
 

@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"github.com/jcocozza/cassidy-connector/strava/auth"
-	"github.com/spf13/cobra"
+	//"github.com/jcocozza/cassidy-connector/strava/auth"
+	//"github.com/spf13/cobra"
 )
-
+/*
 // Will open the browser for the stored application in the config file.
 var grantPermission = &cobra.Command{
 	Use: "grant",
@@ -19,3 +19,4 @@ func init() {
 	rootCmd.AddCommand(grantPermission)
 }
 
+*/

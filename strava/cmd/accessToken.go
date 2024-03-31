@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/jcocozza/cassidy-connector/strava/auth"
 	"github.com/spf13/cobra"
 )
 // Used to get the first access token.
@@ -15,7 +14,9 @@ var initialAccess = &cobra.Command{
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		authorizationCode := args[0]
-		token, err := auth.GetAccessTokenFromAuthorizationCode(authorizationCode)
+		stravaApp := createApp()
+
+		token, err := stravaApp.GetAccessTokenFromAuthorizationCode(authorizationCode)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -30,7 +31,9 @@ var refreshAccessToken = &cobra.Command{
     Args: cobra.ExactArgs(1),
     Run: func(cmd *cobra.Command, args []string) {
 		refreshToken := args[0]
-		token, err := auth.RefreshAccessToken(refreshToken)
+		stravaApp := createApp()
+
+		token, err := stravaApp.RefreshAccessToken(refreshToken)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
