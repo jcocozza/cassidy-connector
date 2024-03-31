@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/jcocozza/cassidy-connector/strava/api"
-	"github.com/jcocozza/cassidy-connector/strava/auth"
+	"github.com/jcocozza/cassidy-connector/strava/app/api"
+	"github.com/jcocozza/cassidy-connector/strava/app/auth"
 	config "github.com/jcocozza/cassidy-connector/strava/internal"
 )
 
@@ -26,7 +26,7 @@ func NewApp(clientId string, clientSecret, redirectUri string, scope string) *Ap
 		StravaAPICaller: api.StravaAPICaller{},
 	}
 }
-// Create the default Cassidy App
+// Create the default Cassidy App for those who don't want to create their own strava app
 func CassidyApp(redirectUri string) *App {
 	return NewApp(config.ClientId, config.ClientSecret, redirectUri, config.Scope)
 }

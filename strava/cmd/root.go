@@ -35,7 +35,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&redirectUri, "redirect-uri", "http://localhost/exchange_token", "the redirect uri of your strava application")
 	rootCmd.PersistentFlags().StringVar(&scope, "scope", "activity:read_all", "the scope requirement of your strava application")
 
-
 	rootCmd.MarkFlagsRequiredTogether("client-id", "client-secret")
 	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "client-id")
 	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "client-secret")

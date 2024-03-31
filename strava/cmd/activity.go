@@ -11,7 +11,7 @@ var perPage int
 var outputPath string
 // used to bulk grab activities
 var getActivities = &cobra.Command{
-	Use: "activity",
+	Use: "activity [access token]",
 	Short: "Get activities. Expects an access token.",
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

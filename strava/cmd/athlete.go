@@ -5,8 +5,8 @@ import (
 )
 
 var getAthlete = &cobra.Command{
-	Use: "athlete",
-	Short: "Get an authenticated athlete. Expects an access token.",
+	Use: "athlete [access token]",
+	Short: "Get an authenticated athlete.",
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		accessToken := args[0]

@@ -10,15 +10,17 @@ const (
 	athleteUrl string = "https://www.strava.com/api/v3/athlete"
 	activitiesUrl string = "https://www.strava.com/api/v3/athlete/activities"
 )
+// This interface is responsible for the non-authentication related methods that interact with the Strava API
 type StravaAPI interface {
 	// Get activities by page
 	//
 	// numPages determines the number of pages to get.
 	// perPage is the number of activities per page. (max 200)
 	GetActivityPages(accessToken string, numPages int, perPage int) ([][]byte, error)
+	// Get an authenticated athlete profile
 	GetAthlete(accessToken string)
 }
-
+// This is the implementation of the StravaAPI interface
 type StravaAPICaller struct {}
 // Get activities by page
 //
@@ -64,6 +66,7 @@ func (sac *StravaAPICaller) GetActivityPages(accessToken string, numPages int, p
 	}
 	return pages, nil
 }
+// Get an authenticated athlete profile
 func (sac *StravaAPICaller) GetAthlete(accessToken string) {
 	// Create a new GET request
 	req, err := http.NewRequest("GET", athleteUrl, nil)
