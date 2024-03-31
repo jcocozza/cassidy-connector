@@ -53,7 +53,6 @@ var approvalUrl = &cobra.Command{
 	},
 }
 
-
 func init() {
 	rootCmd.AddCommand(initialAccess)
     rootCmd.AddCommand(refreshAccessToken)

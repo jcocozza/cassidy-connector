@@ -93,7 +93,6 @@ func (sac *StravaAPICaller) GetAthlete(accessToken string) {
 		fmt.Println("Error reading response body:", err)
 		return
 	}
-
 	// Print response body
 	fmt.Println(string(body))
 }

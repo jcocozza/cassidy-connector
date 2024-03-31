@@ -40,6 +40,7 @@ var getActivities = &cobra.Command{
 			fmt.Println("Error writing to file:", err)
 			return
 		}
+		fmt.Println(string(combined))
 	},
 }
 func init() {
