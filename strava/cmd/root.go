@@ -15,7 +15,9 @@ var useCassidyApp bool
 var clientId string
 var clientSecret string
 var redirectUri string
-var scope string
+var scopes []string
+
+var outputPath string
 
 var rootCmd = &cobra.Command{
 	Use:   "cassidy-strava",
@@ -33,7 +35,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&clientId, "client-id", "", "the client id of your strava application")
 	rootCmd.PersistentFlags().StringVar(&clientSecret, "client-secret", "", "the client secret of your strava application")
 	rootCmd.PersistentFlags().StringVar(&redirectUri, "redirect-uri", "http://localhost/exchange_token", "the redirect uri of your strava application")
-	rootCmd.PersistentFlags().StringVar(&scope, "scope", "activity:read_all", "the scope requirement of your strava application")
+	rootCmd.PersistentFlags().StringSliceVar(&scopes, "scope", []string{"activity:read_all"}, "the scope requirement of your strava application")
+
+	rootCmd.PersistentFlags().StringVarP(&outputPath, "path", "f", "", "The path to save successful output to. (will not write errors at this time)")
 
 	rootCmd.MarkFlagsRequiredTogether("client-id", "client-secret")
 	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "client-id")

@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -9,9 +13,29 @@ var getAthlete = &cobra.Command{
 	Short: "Get an authenticated athlete.",
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		accessToken := args[0]
+		accessTokenString := args[0]
 		stravaApp := createApp()
-		stravaApp.GetAthlete(accessToken)
+		err := stravaApp.LoadToken(accessTokenString)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		athlete, err := stravaApp.Api.GetAthlete(context.TODO())
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		athleteJsonBytes, err := json.Marshal(athlete)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		if outputPath != "" {
+			writeOutput(outputPath, athleteJsonBytes)
+		}
+		fmt.Println(string(athleteJsonBytes))
 	},
 }
 

@@ -1,98 +1,69 @@
 package api
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
+	"context"
+	"time"
+
+	"github.com/antihax/optional"
+	"github.com/jcocozza/cassidy-connector/strava/internal/swagger"
 )
-const (
-	athleteUrl string = "https://www.strava.com/api/v3/athlete"
-	activitiesUrl string = "https://www.strava.com/api/v3/athlete/activities"
-)
-// This interface is responsible for the non-authentication related methods that interact with the Strava API
-type StravaAPI interface {
-	// Get activities by page
-	//
-	// numPages determines the number of pages to get.
-	// perPage is the number of activities per page. (max 200)
-	GetActivityPages(accessToken string, numPages int, perPage int) ([][]byte, error)
-	// Get an authenticated athlete profile
-	GetAthlete(accessToken string)
+
+type StravaAPI struct {
+	stravaClient *swagger.APIClient
 }
-// This is the implementation of the StravaAPI interface
-type StravaAPICaller struct {}
-// Get activities by page
+func NewStravaAPI(stravaClient *swagger.APIClient) *StravaAPI {
+	return &StravaAPI{
+		stravaClient: stravaClient,
+	}
+}
+// Get the athlete that is logged-in/authenticated
+func (api *StravaAPI) GetAthlete(ctx context.Context) (*swagger.DetailedAthlete, error) {
+    athlete, _, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
+    if err != nil {
+        return nil, err
+    }
+    return &athlete, nil
+}
+// Get activities. Will enumerate through all available pages of data.
 //
-// numPages determines the number of pages to get.
-// perPage is the number of activities per page. (max 200)
-func (sac *StravaAPICaller) GetActivityPages(accessToken string, numPages int, perPage int) ([][]byte, error) {
-	pages := [][]byte{}
-	// page enumerate starts at 1
-	for i := 1; i <= numPages; i++ {
-		query := url.Values{}
-		query.Set("per_page", fmt.Sprint(perPage))
-		query.Set("page", fmt.Sprint(i))
+// before and after are times to filter activies by. Both are optional (pass in nil to ignore them)
+// 	- before will filter for activities before a passed time.Time
+//	- after will filter for activities after the passed time.Time
+// before and after are converted to epoch timestamp integers.
+//
+// perPage is the number of activities per page. (default 30) (max 200)
+//
+// If you plan on retreiving lots of data, you should set per page to be high. This will drastically reduce the number of API calls made.
+// (There is an API call made for each page)
+func (api *StravaAPI) GetActivities(ctx context.Context, perPage int, before, after *time.Time) ([][]swagger.SummaryActivity, error) {
+	var summaryActivitylol [][]swagger.SummaryActivity
+	opts := &swagger.ActivitiesApiGetLoggedInAthleteActivitiesOpts{}
+	if before != nil {
+		beforeOpt := optional.NewInt32(int32(before.Unix()))
+		opts.Before = beforeOpt
+	}
+	if after != nil {
+		afterOpt := optional.NewInt32(int32(after.Unix()))
+		opts.After = afterOpt
+	}
+	perPageOpt := optional.NewInt32(int32(perPage))
+	opts.PerPage = perPageOpt
 
-		urlWithParams := fmt.Sprintf("%s?%s", activitiesUrl, query.Encode())
-
-		// Create a new GET request
-		req, err := http.NewRequest("GET", urlWithParams, nil)
+	existsMore := true
+	var page int32 = 1 // page enumeration starts at 1
+	for existsMore { // enumerate until there are no more activities
+		opts.Page = optional.NewInt32(page)
+		summary, _, err := api.stravaClient.ActivitiesApi.GetLoggedInAthleteActivities(ctx, opts)
 		if err != nil {
-			fmt.Println("Error creating request:", err)
 			return nil, err
 		}
-		// Set Authorization header with access token
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-		// Perform the request
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Println("Error performing request:", err)
-			return nil, err
-		}
-		defer resp.Body.Close()
-		// Read response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println("Error reading response body:", err)
-			return nil, err
-		}
-		// the api doesn't quite return an empty body I guess?
-		if len(body) == 2 {
-			break
-		}
-		pages = append(pages, body)
-	}
-	return pages, nil
-}
-// Get an authenticated athlete profile
-func (sac *StravaAPICaller) GetAthlete(accessToken string) {
-	// Create a new GET request
-	req, err := http.NewRequest("GET", athleteUrl, nil)
-	if err != nil {
-		fmt.Println("Error creating request:", err)
-		return
-	}
+		//return summary, nil
+		summaryActivitylol = append(summaryActivitylol, summary)
+		page += 1
 
-	// Set Authorization header with access token
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-
-	// Perform the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error performing request:", err)
-		return
+		if len(summary) == 0 {
+			existsMore = false
+		}
 	}
-	defer resp.Body.Close()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error reading response body:", err)
-		return
-	}
-	// Print response body
-	fmt.Println(string(body))
+	return summaryActivitylol, nil
 }

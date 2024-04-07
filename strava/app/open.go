@@ -1,12 +1,9 @@
-package auth
+package app
 
 import (
 	"fmt"
 	"os/exec"
 	"runtime"
-
-	//config "github.com/jcocozza/cassidy-connector/strava/internal"
-	//"github.com/jcocozza/cassidy-connector/strava/internal/auth"
 )
 
 // Will open a link in the browser
@@ -29,10 +26,3 @@ func openURL(url string) error {
     }
     return nil
 }
-/*
-// open the approval url in browser
-func InitialAuthorizationDirect() {
-	approvalUrl := auth.GenerateApprovalUrl(config.ClientId, "http://localhost/exchange_token", "activity:read_all")
-	openURL(approvalUrl)
-}
-*/
