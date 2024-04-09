@@ -7,7 +7,11 @@ import (
 	"github.com/antihax/optional"
 	"github.com/jcocozza/cassidy-connector/strava/internal/swagger"
 )
-
+// The StravaAPI struct is the primary means of interacting with the strava api.
+//
+// This is the layer of abstraction so that users don't have to directly deal with api calls.
+//
+// It will handle methods related to data in the strava api. (auth will be handled by the broader app struct)
 type StravaAPI struct {
 	stravaClient *swagger.APIClient
 }
@@ -24,7 +28,7 @@ func (api *StravaAPI) GetAthlete(ctx context.Context) (*swagger.DetailedAthlete,
     }
     return &athlete, nil
 }
-// Get activities. Will enumerate through all available pages of data.
+// Get activities. Will cycle through all available pages of data.
 //
 // before and after are times to filter activies by. Both are optional (pass in nil to ignore them)
 // 	- before will filter for activities before a passed time.Time

@@ -29,7 +29,7 @@ var initialAccess = &cobra.Command{
 
 		jsonBytes, err := json.Marshal(stravaApp.Token)
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Println(err.Error())
 			return
 		}
 
@@ -57,6 +57,5 @@ var approvalUrl = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(initialAccess)
-    // rootCmd.AddCommand(refreshAccessToken)
 	rootCmd.AddCommand(approvalUrl)
 }

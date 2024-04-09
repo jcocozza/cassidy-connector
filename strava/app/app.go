@@ -18,6 +18,19 @@ const (
 	approvalPrompt string = "force"
 	approvalUrlFormat string = "https://www.strava.com/oauth/authorize?client_id=%s&response_type=%s&redirect_uri=%s&approval_prompt=%s&scope=%s"
 )
+// An app is a way of interacting with the strava api.
+//
+// There are two main components to this struct:
+// 	1) The Strava API application. These are created by strava users and managed at `https://www.strava.com/settings/api`.
+//		These are the `ClientId`, `ClientSecret`, `RedirectURL`, `Scopes`.
+//		Given these identifiers we can properly interact with the OAuth2 Strava API (which is #2)
+//	2) The interaction with the Strava API.
+//		This is handled via OAuth2.
+//		The `App` struct contains the necessary methods for authenticating and connecting Strava API applications.
+//		This is handled by `OAuthConfig`, `SwaggerConfig`, `StravaClient`, and `Token`.
+//		`StravaClient` also exposes the various Swagger API services for those that want to use the swagger methods directly.
+//		The swagger methods/api calls are wrapped by the custom functions that allow for a layer of abstration to simplify interaction with the strava api.
+//		This is all found the the `Api` field of the `App` struct
 type App struct {
 	ClientId string
 	ClientSecret string
@@ -38,7 +51,6 @@ type App struct {
 	//   - by possessing an existing refresh token and getting a new access token (handled automatically by the oauth2 package).
 	//   - via user authorization, whereby an auth code is issued and is used to get the access token.
 	Token *oauth2.Token
-
 	// This is where the data methods are called from.
 	// It is a layer of abstraction to simplify making calls to the strava API.
 	// This is the primary purpose of this package.
@@ -76,8 +88,8 @@ func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) 
 	}
 }
 // Create the default Cassidy App for those who don't want to create their own strava app
-func CassidyApp(redirectUri string) *App {
-	return NewApp(config.ClientId, config.ClientSecret, redirectUri, config.Scopes)
+func CassidyApp(redirectURL string) *App {
+	return NewApp(config.ClientId, config.ClientSecret, redirectURL, config.Scopes)
 }
 // Return the approval url
 func (a *App) ApprovalUrl() string {
@@ -98,7 +110,6 @@ func (a *App) GetAccessTokenFromAuthorizationCode(ctx context.Context, code stri
 	a.SwaggerConfig.HTTPClient = httpClient
 	return nil
 }
-
 // Turn a json string token into an `oauth2.Token` struct and load it into the app
 func (a *App) LoadToken(tokenJsonString string) error {
 	var token oauth2.Token

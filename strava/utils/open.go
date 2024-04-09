@@ -1,4 +1,4 @@
-package app
+package utils
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 )
 
 // Will open a link in the browser
-func openURL(url string) error {
+func OpenURL(url string) error {
     var cmd *exec.Cmd
     switch runtime.GOOS {
     case "linux":

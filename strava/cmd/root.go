@@ -9,14 +9,12 @@ import (
 
 const version = "0.0.1"
 
+// global app flag variables
 var useCassidyApp bool
-
-// app flags
 var clientId string
 var clientSecret string
-var redirectUri string
+var redirectURL string
 var scopes []string
-
 var outputPath string
 
 var rootCmd = &cobra.Command{
@@ -34,7 +32,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&clientId, "client-id", "", "the client id of your strava application")
 	rootCmd.PersistentFlags().StringVar(&clientSecret, "client-secret", "", "the client secret of your strava application")
-	rootCmd.PersistentFlags().StringVar(&redirectUri, "redirect-uri", "http://localhost/exchange_token", "the redirect uri of your strava application")
+	rootCmd.PersistentFlags().StringVar(&redirectURL, "redirect-url", "http://localhost/exchange_token", "the redirect url of your strava application")
 	rootCmd.PersistentFlags().StringSliceVar(&scopes, "scope", []string{"activity:read_all"}, "the scope requirement of your strava application")
 
 	rootCmd.PersistentFlags().StringVarP(&outputPath, "path", "f", "", "The path to save successful output to. (will not write errors at this time)")

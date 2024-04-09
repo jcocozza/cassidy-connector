@@ -10,13 +10,13 @@ import (
 func createApp() *app.App {
 	var stravaApp *app.App
 	if useCassidyApp {
-		stravaApp = app.CassidyApp(redirectUri)
+		stravaApp = app.CassidyApp(redirectURL)
 	} else {
-		stravaApp = app.NewApp(clientId, clientSecret, redirectUri, scopes)
+		stravaApp = app.NewApp(clientId, clientSecret, redirectURL, scopes)
 	}
 	return stravaApp
 }
-
+// write a slice of bytes to a file
 func writeOutput(filePath string, content []byte) error {
 	return os.WriteFile(filePath, content, 0644)
 }
