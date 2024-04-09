@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jcocozza/cassidy-connector/strava/app/api"
 	config "github.com/jcocozza/cassidy-connector/strava/internal"
@@ -121,4 +122,23 @@ func (a *App) LoadToken(tokenJsonString string) error {
 	a.Token = &token
 	a.SwaggerConfig.HTTPClient = httpClient
 	return nil
+}
+// Load an oauth2 token into the app
+func (a *App) LoadTokenDirect(token *oauth2.Token) {
+	httpClient := a.OAuthConfig.Client(context.TODO(), token)
+	a.Token = token
+	a.SwaggerConfig.HTTPClient = httpClient
+}
+// Create the OAuth2 token that is used for authentication in the app.
+//
+// The primary usecase for this is reading in a saved token from a database or file.
+// Once you've read in the token information, you can easily create a token with this method.
+// Then you can load the token into the app via the `LoadTokenDirect()` function.
+func (a *App) CreateToken(accessToken string, tokenType string, refreshToken string, expiry time.Time) *oauth2.Token {
+	return &oauth2.Token{
+		AccessToken: accessToken,
+		TokenType: tokenType,
+		RefreshToken: refreshToken,
+		Expiry: expiry,
+	}
 }
