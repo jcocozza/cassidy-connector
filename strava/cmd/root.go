@@ -99,7 +99,7 @@ func initConfig() {
 		rootCmd.Flags().Set("scopes", scopeStr)
 	}
 	if config.TokenPath != "" {
-		rootCmd.Flags().Set("token-path", config.TokenPath)
+		tokenCmdGroup.Flags().Set("token-path", config.TokenPath)
 	}
 }
 
@@ -120,7 +120,6 @@ func init() {
 	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "client-id")
 	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "client-secret")
 	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "scopes")
-
 
 	tokenCmdGroup.PersistentFlags().StringVar(&tokenPath, "token-path", "", "the path to a .json file that contains an OAuth2 token. This json must conform to the `oauth2.Token` struct found here: https://pkg.go.dev/golang.org/x/oauth2#Token.")
 	tokenCmdGroup.PersistentFlags().StringVar(&token, "token", "", "a json token. you must include the entire token wrapped in ``. the json token conforms to `oauth2.Token` struct found here: https://pkg.go.dev/golang.org/x/oauth2#Token. (this is an ugly, but can be useful for testing purposes)")
