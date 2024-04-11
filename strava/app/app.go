@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -112,7 +113,7 @@ func (a *App) GetAccessTokenFromAuthorizationCode(ctx context.Context, code stri
 	return nil
 }
 // Turn a json string token into an `oauth2.Token` struct and load it into the app
-func (a *App) LoadToken(tokenJsonString string) error {
+func (a *App) LoadTokenString(tokenJsonString string) error {
 	var token oauth2.Token
 	err := json.Unmarshal([]byte(tokenJsonString), &token)
     if err != nil {
@@ -129,12 +130,29 @@ func (a *App) LoadTokenDirect(token *oauth2.Token) {
 	a.Token = token
 	a.SwaggerConfig.HTTPClient = httpClient
 }
+// Load an oauth2 token into the app from a .json file
+func (a *App) LoadTokenFromFile(tokenFilePath string) error {
+	tokenData, err := os.ReadFile(tokenFilePath)
+	if err != nil {
+		return err
+	}
+
+	var token oauth2.Token
+	err = json.Unmarshal(tokenData, &token)
+	if err != nil {
+		return err
+	}
+
+	a.LoadTokenDirect(&token)
+	return nil
+}
+
 // Create the OAuth2 token that is used for authentication in the app.
 //
 // The primary usecase for this is reading in a saved token from a database or file.
 // Once you've read in the token information, you can easily create a token with this method.
 // Then you can load the token into the app via the `LoadTokenDirect()` function.
-func (a *App) CreateToken(accessToken string, tokenType string, refreshToken string, expiry time.Time) *oauth2.Token {
+func (a *App) createToken(accessToken string, tokenType string, refreshToken string, expiry time.Time) *oauth2.Token {
 	return &oauth2.Token{
 		AccessToken: accessToken,
 		TokenType: tokenType,

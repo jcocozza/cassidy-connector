@@ -11,19 +11,17 @@ import (
 
 var includeAllEfforts bool
 var getActivity = &cobra.Command{
-	Use: "activity [access token] [activity id]",
-	Short: "Get an activity by activity id. Expects access token and activity id.",
-	Args: cobra.ExactArgs(2),
+	Use: "activity [activity id]",
+	Short: "Get an activity by activity id. Expects an activity id.",
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		tokenString := args[0]
-		stravaApp := createApp()
-		err := stravaApp.LoadToken(tokenString)
+		stravaApp, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
-		idString := args[1]
+		idString := args[0]
 		activityId, err := strconv.Atoi(idString)
 		if err != nil {
 			fmt.Println(err.Error())
@@ -49,6 +47,5 @@ var getActivity = &cobra.Command{
 }
 func init() {
 	getActivity.Flags().BoolVarP(&includeAllEfforts, "include-all-efforts", "i", false, "include all segment efforts")
-
-	rootCmd.AddCommand(getActivity)
+	tokenCmdGroup.AddCommand(getActivity)
 }

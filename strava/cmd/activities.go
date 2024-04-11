@@ -15,13 +15,11 @@ var perPage int
 var before string
 var after string
 var getActivities = &cobra.Command{
-	Use: "activities [access token]",
-	Short: "Get activities. Expects an access token",
-	Args: cobra.ExactArgs(1),
+	Use: "activities",
+	Short: "Get activities.",
+	Args: cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		tokenString := args[0]
-		stravaApp := createApp()
-		err := stravaApp.LoadToken(tokenString)
+		stravaApp, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -69,5 +67,5 @@ func init() {
 	getActivities.Flags().StringVarP(&before, "before", "b", "", fmt.Sprintf("Filter to only include activities before this date. Must be of the format: %s", layoutInterpretation))
 	getActivities.Flags().StringVarP(&after, "after", "a", "", fmt.Sprintf("Filter to only include activities after this date. Must be of the format: %s", layoutInterpretation))
 
-	rootCmd.AddCommand(getActivities)
+	tokenCmdGroup.AddCommand(getActivities)
 }

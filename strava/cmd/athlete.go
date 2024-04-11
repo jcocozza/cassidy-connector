@@ -9,13 +9,11 @@ import (
 )
 
 var getAthlete = &cobra.Command{
-	Use: "athlete [access token]",
+	Use: "athlete",
 	Short: "Get an authenticated athlete.",
-	Args: cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		accessTokenString := args[0]
-		stravaApp := createApp()
-		err := stravaApp.LoadToken(accessTokenString)
+		stravaApp, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -40,5 +38,5 @@ var getAthlete = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(getAthlete)
+	tokenCmdGroup.AddCommand(getAthlete)
 }

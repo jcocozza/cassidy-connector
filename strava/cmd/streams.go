@@ -12,21 +12,19 @@ import (
 
 var keys []string
 var getStreams = &cobra.Command{
-	Use: "streams [access token] [activity id]",
+	Use: "streams [activity id]",
 	Short: "Get streams for a given activity",
 	Long: `Get streams for a given activity. Stream types include:
 time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, temp, moving, and grade_smooth`,
-	Args: cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		tokenString := args[0]
-		stravaApp := createApp()
-		err := stravaApp.LoadToken(tokenString)
+		stravaApp, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
-		idString := args[1]
+		idString := args[0]
 		activityId, err := strconv.Atoi(idString)
 		if err != nil {
 			fmt.Println(err.Error())
@@ -57,7 +55,7 @@ time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, te
 }
 func init() {
 	getStreams.Flags().StringSliceVarP(&keys, "stream-types", "t", []string{"time", "distance"}, "a comma separated list of the stream types to get.")
-	getStreams.MarkFlagRequired("stream-types")
+	//getStreams.MarkFlagRequired("stream-types")
 
-	rootCmd.AddCommand(getStreams)
+	tokenCmdGroup.AddCommand(getStreams)
 }

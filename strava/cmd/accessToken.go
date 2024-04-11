@@ -19,11 +19,15 @@ var initialAccess = &cobra.Command{
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		authorizationCode := args[0]
-		stravaApp := createApp()
-
-		err := stravaApp.GetAccessTokenFromAuthorizationCode(context.TODO(), authorizationCode)
+		stravaApp, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
+			return
+		}
+
+		err1 := stravaApp.GetAccessTokenFromAuthorizationCode(context.TODO(), authorizationCode)
+		if err1 != nil {
+			fmt.Println(err1.Error())
 			return
 		}
 
@@ -45,7 +49,11 @@ var approvalUrl = &cobra.Command{
 	Short: "Generate the approval url for the user to grant access.",
 	Args: cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		stravaApp := createApp()
+		stravaApp, err := createApp()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
 		url := stravaApp.ApprovalUrl()
 
 		if outputPath != "" {
