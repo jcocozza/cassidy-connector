@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/jcocozza/cassidy-connector/strava/app/api"
-	config "github.com/jcocozza/cassidy-connector/strava/internal"
+	//config "github.com/jcocozza/cassidy-connector/strava/internal"
 	"github.com/jcocozza/cassidy-connector/strava/internal/swagger"
 	"github.com/jcocozza/cassidy-connector/strava/utils"
 
@@ -91,10 +91,12 @@ func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) 
 		Api: api.NewStravaAPI(client),
 	}
 }
+/*
 // Create the default Cassidy App for those who don't want to create their own strava app
 func CassidyApp(redirectURL string) *App {
 	return NewApp(config.ClientId, config.ClientSecret, redirectURL, config.Scopes)
 }
+*/
 // Return the approval url
 func (a *App) ApprovalUrl() string {
 	scopeStr := strings.Join(a.Scopes, ",")

@@ -31,7 +31,6 @@ Flags:
   -f, --path string            the path to save successful output to. (will not write errors at this time)
       --redirect-url string    the redirect url of your strava application (default "http://localhost/exchange_token")
       --scopes strings         the scope requirement of your strava application (default [activity:read_all])
-  -c, --use-cassidy            include this flag if you want to use the cassidy's strava application as opposed to your own.
   -v, --version                version for cassidy-strava
 
 Use "cassidy-strava [command] --help" for more information about a command.
@@ -77,7 +76,6 @@ Global Flags:
   -f, --path string            the path to save successful output to. (will not write errors at this time)
       --redirect-url string    the redirect url of your strava application (default "http://localhost/exchange_token")
       --scopes strings         the scope requirement of your strava application (default [activity:read_all])
-  -c, --use-cassidy            include this flag if you want to use the cassidy's strava application as opposed to your own.
 
 Use "cassidy-strava api [command] --help" for more information about a command.
 ```
