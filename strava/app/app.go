@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/jcocozza/cassidy-connector/strava/app/api"
 	config "github.com/jcocozza/cassidy-connector/strava/internal"
 	"github.com/jcocozza/cassidy-connector/strava/internal/swagger"
+	"github.com/jcocozza/cassidy-connector/strava/utils"
 
 	"golang.org/x/oauth2"
 )
@@ -146,7 +148,21 @@ func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 	a.LoadTokenDirect(&token)
 	return nil
 }
-
+// Get the authorization code form the url that results from the redirect
+func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract URL parameters here and handle them accordingly
+	code := r.URL.Query().Get("code") // Assuming 'code' is the parameter sent by Strava
+	fmt.Println(code)
+}
+// Listen for the redirect
+func (a *App) StartStravaHttpListener() {
+	http.HandleFunc(a.RedirectURL, a.stravaRedirectHandler)
+	http.ListenAndServe(a.RedirectURL, nil)
+}
+func (a *App) OpenAuthorizationGrant() {
+	url := a.ApprovalUrl()
+	utils.OpenURL(url)
+}
 // Create the OAuth2 token that is used for authentication in the app.
 //
 // The primary usecase for this is reading in a saved token from a database or file.
