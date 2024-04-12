@@ -181,8 +181,7 @@ func (a *App) StartStravaHttpListener() error {
 
 	fmt.Println("Running ListenAndServe on: " + hostWithPort + " at path: " + path)
 	http.HandleFunc(path, a.stravaRedirectHandler)
-	http.ListenAndServe(hostWithPort, nil)
-	return nil
+	return http.ListenAndServe(hostWithPort, nil)
 }
 // Open the Approval Url in the users browser
 func (a *App) OpenAuthorizationGrant() {
