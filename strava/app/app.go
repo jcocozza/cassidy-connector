@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -55,6 +56,8 @@ type App struct {
 	//   - by possessing an existing refresh token and getting a new access token (handled automatically by the oauth2 package).
 	//   - via user authorization, whereby an auth code is issued and is used to get the access token.
 	Token *oauth2.Token
+	// A way to get the authorization token from the intial authorization process
+	AuthorizationReciever chan string
 	// This is where the data methods are called from.
 	// It is a layer of abstraction to simplify making calls to the strava API.
 	// This is the primary purpose of this package.
@@ -79,6 +82,7 @@ func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) 
 	}
 	cfg := swagger.NewConfiguration()
 	client := swagger.NewAPIClient(cfg)
+	reciever := make(chan string)
 	return &App{
 		ClientId: clientId,
 		ClientSecret: clientSecret,
@@ -89,6 +93,7 @@ func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) 
 		OAuthConfig: oauthCfg,
 		StravaClient: client,
 		Api: api.NewStravaAPI(client),
+		AuthorizationReciever: reciever,
 	}
 }
 /*
@@ -155,12 +160,31 @@ func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract URL parameters here and handle them accordingly
 	code := r.URL.Query().Get("code") // Assuming 'code' is the parameter sent by Strava
 	fmt.Println(code)
+	a.AuthorizationReciever <- code
 }
-// Listen for the redirect
-func (a *App) StartStravaHttpListener() {
-	http.HandleFunc(a.RedirectURL, a.stravaRedirectHandler)
-	http.ListenAndServe(a.RedirectURL, nil)
+// Parse a url into its "address:port" and its "url/path"
+//
+// e.g. http://localhost:9999/strava/callback -> "localhost:9999", "strava/callback", err
+func parseURL(inputURL string) (string, string, error) {
+    parsedURL, err := url.Parse(inputURL)
+    if err != nil {
+        return "", "", err
+    }
+    return parsedURL.Host, parsedURL.Path[1:], nil // [1:] is used to remove the leading '/'
 }
+// Listen to the redirect route. Once the user is directed to it, we can extract the token from the url.
+func (a *App) StartStravaHttpListener() error {
+	hostWithPort, path, err := parseURL(a.RedirectURL)
+
+	if err != nil {
+		return err
+	}
+
+	http.HandleFunc(path, a.stravaRedirectHandler)
+	http.ListenAndServe(hostWithPort, nil)
+	return nil
+}
+// Open the Approval Url in the users browser
 func (a *App) OpenAuthorizationGrant() {
 	url := a.ApprovalUrl()
 	utils.OpenURL(url)
