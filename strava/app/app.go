@@ -175,11 +175,11 @@ func parseURL(inputURL string) (string, string, error) {
 // Listen to the redirect route. Once the user is directed to it, we can extract the token from the url.
 func (a *App) StartStravaHttpListener() error {
 	hostWithPort, path, err := parseURL(a.RedirectURL)
-
 	if err != nil {
 		return err
 	}
 
+	fmt.Println("Running ListenAndServe on: " + hostWithPort + " at path: " + path)
 	http.HandleFunc(path, a.stravaRedirectHandler)
 	http.ListenAndServe(hostWithPort, nil)
 	return nil
