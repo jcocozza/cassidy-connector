@@ -158,6 +158,7 @@ func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 // Get the authorization code form the url that results from the redirect
 func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract URL parameters here and handle them accordingly
+	fmt.Println("HANDLER CALLED")
 	code := r.URL.Query().Get("code") // Assuming 'code' is the parameter sent by Strava
 	fmt.Println(code)
 	a.AuthorizationReciever <- code
