@@ -25,13 +25,13 @@ var initialAccess = &cobra.Command{
 			return
 		}
 
-		err1 := stravaApp.GetAccessTokenFromAuthorizationCode(context.TODO(), authorizationCode)
+		token, err1 := stravaApp.GetAccessTokenFromAuthorizationCode(context.TODO(), authorizationCode)
 		if err1 != nil {
 			fmt.Println(err1.Error())
 			return
 		}
 
-		jsonBytes, err := json.Marshal(stravaApp.Token)
+		jsonBytes, err := json.Marshal(token)
 		if err != nil {
 			fmt.Println(err.Error())
 			return

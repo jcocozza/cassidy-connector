@@ -107,19 +107,19 @@ func (a *App) ApprovalUrl() string {
 	scopeStr := strings.Join(a.Scopes, ",")
 	return fmt.Sprintf(approvalUrlFormat, a.ClientId, responseType, a.RedirectURL, approvalPrompt, scopeStr)
 }
-// This is for the FIRST TIME getting the access token.
+// This is for the FIRST TIME getting the access token. It will set the token internally to the app.
 //
 // A user will grant permission to the app then will be redirected to the application's RedirectURL.
 // The RedirectURL will contain an authorization code. This code is used to get the user's access token.
-func (a *App) GetAccessTokenFromAuthorizationCode(ctx context.Context, code string) error {
+func (a *App) GetAccessTokenFromAuthorizationCode(ctx context.Context, code string) (*oauth2.Token, error) {
 	token, err := a.OAuthConfig.Exchange(ctx, code)
     if err != nil {
-        return err
+        return nil, err
     }
 	httpClient := a.OAuthConfig.Client(ctx, token)
 	a.Token = token
 	a.SwaggerConfig.HTTPClient = httpClient
-	return nil
+	return token, nil
 }
 // Turn a json string token into an `oauth2.Token` struct and load it into the app
 func (a *App) LoadTokenString(tokenJsonString string) error {
@@ -156,9 +156,9 @@ func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 	return nil
 }
 // Get the authorization code form the url that results from the redirect
+// TODO: Handle denial of permission / error
 func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract URL parameters here and handle them accordingly
-	fmt.Println("HANDLER CALLED")
 	code := r.URL.Query().Get("code") // Assuming 'code' is the parameter sent by Strava
 	fmt.Println(code)
 	a.AuthorizationReciever <- code
@@ -183,6 +183,31 @@ func (a *App) StartStravaHttpListener() error {
 	fmt.Println("Running ListenAndServe on: " + hostWithPort + " at path: /" + path)
 	http.HandleFunc("/" + path, a.stravaRedirectHandler)
 	return http.ListenAndServe(hostWithPort, nil)
+}
+// Run this function when you send the user to strava's authorization site.
+//
+// It will start an http listener that listens on the redirect route provided by your app.
+// Once the user authorizes the app and is redirected, the http ListenAndServe will detect the authorization code and push it to the AuthorizationReciever channel.
+// Finally, the GetAccessTokenFromAuthorizationCode will set the app's token.
+//
+// From there, you can persist the token in whatever way you please for further access.
+//
+// TODO: Add a timeout to this
+func (a *App) AwaitInitialToken() *oauth2.Token {
+	go func() {
+		err := a.StartStravaHttpListener()
+		if err != nil {
+			fmt.Println("ListenAndServe: ", err.Error())
+		}
+	}()
+
+	code := <- a.AuthorizationReciever
+	token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil
+	}
+	return token
 }
 // Open the Approval Url in the users browser
 func (a *App) OpenAuthorizationGrant() {
