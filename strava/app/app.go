@@ -11,35 +11,36 @@ import (
 	"time"
 
 	"github.com/jcocozza/cassidy-connector/strava/app/api"
-	"github.com/jcocozza/cassidy-connector/strava/internal/swagger"
+	"github.com/jcocozza/cassidy-connector/strava/swagger"
 	"github.com/jcocozza/cassidy-connector/strava/utils"
 
 	"golang.org/x/oauth2"
 )
 
 const (
-	responseType string = "code"
-	approvalPrompt string = "force"
+	responseType      string = "code"
+	approvalPrompt    string = "force"
 	approvalUrlFormat string = "https://www.strava.com/oauth/authorize?client_id=%s&response_type=%s&redirect_uri=%s&approval_prompt=%s&scope=%s"
 )
+
 // An app is a way of interacting with the strava api.
 //
 // There are two main components to this struct:
-// 	1) The Strava API application. These are created by strava users and managed at `https://www.strava.com/settings/api`.
-//		These are the `ClientId`, `ClientSecret`, `RedirectURL`, `Scopes`.
-//		Given these identifiers we can properly interact with the OAuth2 Strava API (which is #2)
-//	2) The interaction with the Strava API.
-//		This is handled via OAuth2.
-//		The `App` struct contains the necessary methods for authenticating and connecting Strava API applications.
-//		This is handled by `OAuthConfig`, `SwaggerConfig`, `StravaClient`, and `Token`.
-//		`StravaClient` also exposes the various Swagger API services for those that want to use the swagger methods directly.
-//		The swagger methods/api calls are wrapped by the custom functions that allow for a layer of abstration to simplify interaction with the strava api.
-//		This is all found the the `Api` field of the `App` struct
+//  1. The Strava API application. These are created by strava users and managed at `https://www.strava.com/settings/api`.
+//     These are the `ClientId`, `ClientSecret`, `RedirectURL`, `Scopes`.
+//     Given these identifiers we can properly interact with the OAuth2 Strava API (which is #2)
+//  2. The interaction with the Strava API.
+//     This is handled via OAuth2.
+//     The `App` struct contains the necessary methods for authenticating and connecting Strava API applications.
+//     This is handled by `OAuthConfig`, `SwaggerConfig`, `StravaClient`, and `Token`.
+//     `StravaClient` also exposes the various Swagger API services for those that want to use the swagger methods directly.
+//     The swagger methods/api calls are wrapped by the custom functions that allow for a layer of abstration to simplify interaction with the strava api.
+//     This is all found the the `Api` field of the `App` struct
 type App struct {
-	ClientId string
+	ClientId     string
 	ClientSecret string
-	RedirectURL string
-	Scopes []string
+	RedirectURL  string
+	Scopes       []string
 	// OAuthConfig handles OAuth and creates the HTTPClient that is used to make requests for the StravaClient
 	OAuthConfig *oauth2.Config
 	// The SwaggerConfig is passed into the creation of the StravaClient.
@@ -63,6 +64,7 @@ type App struct {
 	// This is the primary purpose of this package.
 	Api *api.StravaAPI
 }
+
 // Format the ApprovalUrlFormat
 func generateApprovalUrl(clientId string, redirectUrl string, scopes []string) string {
 	scopeStr := strings.Join(scopes, ",")
@@ -71,12 +73,12 @@ func generateApprovalUrl(clientId string, redirectUrl string, scopes []string) s
 func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) *App {
 	approvalUrl := generateApprovalUrl(clientId, redirectURL, scopes)
 	oauthCfg := &oauth2.Config{
-		ClientID: clientId,
+		ClientID:     clientId,
 		ClientSecret: clientSecret,
-		RedirectURL: redirectURL,
-		Scopes: scopes,
+		RedirectURL:  redirectURL,
+		Scopes:       scopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL: approvalUrl,
+			AuthURL:  approvalUrl,
 			TokenURL: "https://www.strava.com/oauth/token",
 		},
 	}
@@ -84,15 +86,15 @@ func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) 
 	client := swagger.NewAPIClient(cfg)
 	reciever := make(chan string)
 	return &App{
-		ClientId: clientId,
+		ClientId:     clientId,
 		ClientSecret: clientSecret,
-		RedirectURL: redirectURL,
-		Scopes: scopes,
+		RedirectURL:  redirectURL,
+		Scopes:       scopes,
 
-		SwaggerConfig: cfg,
-		OAuthConfig: oauthCfg,
-		StravaClient: client,
-		Api: api.NewStravaAPI(client),
+		SwaggerConfig:         cfg,
+		OAuthConfig:           oauthCfg,
+		StravaClient:          client,
+		Api:                   api.NewStravaAPI(client),
 		AuthorizationReciever: reciever,
 	}
 }
@@ -102,38 +104,42 @@ func (a *App) ApprovalUrl() string {
 	scopeStr := strings.Join(a.Scopes, ",")
 	return fmt.Sprintf(approvalUrlFormat, a.ClientId, responseType, a.RedirectURL, approvalPrompt, scopeStr)
 }
+
 // This is for the FIRST TIME getting the access token. It will set the token internally to the app.
 //
 // A user will grant permission to the app then will be redirected to the application's RedirectURL.
 // The RedirectURL will contain an authorization code. This code is used to get the user's access token.
 func (a *App) GetAccessTokenFromAuthorizationCode(ctx context.Context, code string) (*oauth2.Token, error) {
 	token, err := a.OAuthConfig.Exchange(ctx, code)
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 	httpClient := a.OAuthConfig.Client(ctx, token)
 	a.Token = token
 	a.SwaggerConfig.HTTPClient = httpClient
 	return token, nil
 }
+
 // Turn a json string token into an `oauth2.Token` struct and load it into the app
 func (a *App) LoadTokenString(tokenJsonString string) error {
 	var token oauth2.Token
 	err := json.Unmarshal([]byte(tokenJsonString), &token)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 	httpClient := a.OAuthConfig.Client(context.TODO(), &token)
 	a.Token = &token
 	a.SwaggerConfig.HTTPClient = httpClient
 	return nil
 }
+
 // Load an oauth2 token into the app
 func (a *App) LoadTokenDirect(token *oauth2.Token) {
 	httpClient := a.OAuthConfig.Client(context.TODO(), token)
 	a.Token = token
 	a.SwaggerConfig.HTTPClient = httpClient
 }
+
 // Load an oauth2 token into the app from a .json file
 func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 	tokenData, err := os.ReadFile(tokenFilePath)
@@ -150,6 +156,7 @@ func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 	a.LoadTokenDirect(&token)
 	return nil
 }
+
 // Get the authorization code form the url that results from the redirect.
 // This is written to the AuthorizationReciever channel.
 //
@@ -164,16 +171,18 @@ func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		a.AuthorizationReciever <- "error:" + err
 	}
 }
+
 // Parse a url into its "address:port" and its "url/path"
 //
 // e.g. http://localhost:9999/strava/callback -> "localhost:9999", "strava/callback", err
 func parseURL(inputURL string) (string, string, error) {
-    parsedURL, err := url.Parse(inputURL)
-    if err != nil {
-        return "", "", err
-    }
-    return parsedURL.Host, parsedURL.Path[1:], nil // [1:] is used to remove the leading '/'
+	parsedURL, err := url.Parse(inputURL)
+	if err != nil {
+		return "", "", err
+	}
+	return parsedURL.Host, parsedURL.Path[1:], nil // [1:] is used to remove the leading '/'
 }
+
 // Listen to the redirect route. Once the user is directed to it, we can extract the token from the url.
 func (a *App) StartStravaHttpListener() error {
 	hostWithPort, path, err := parseURL(a.RedirectURL)
@@ -182,9 +191,10 @@ func (a *App) StartStravaHttpListener() error {
 	}
 
 	//fmt.Println("Running ListenAndServe on: " + hostWithPort + " at path: /" + path)
-	http.HandleFunc("/" + path, a.stravaRedirectHandler)
+	http.HandleFunc("/"+path, a.stravaRedirectHandler)
 	return http.ListenAndServe(hostWithPort, nil)
 }
+
 // Run this function when you send the user to strava's authorization site.
 //
 // `timeoutDuration` is the time in seconds wait before returning nothing. Use -1 for no timeout duration.
@@ -225,7 +235,7 @@ func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
 	}()
 
 	if timeoutDuration == -1 {
-		code := <- a.AuthorizationReciever
+		code := <-a.AuthorizationReciever
 		token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
 		if err != nil {
 			return nil, err
@@ -233,24 +243,26 @@ func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
 		return token, nil
 	} else {
 		select {
-		case code := <- a.AuthorizationReciever:
+		case code := <-a.AuthorizationReciever:
 			// recieved token
 			token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
 			if err != nil {
 				return nil, err
 			}
 			return token, nil
-		case <- time.After(time.Duration(timeoutDuration) * time.Second):
+		case <-time.After(time.Duration(timeoutDuration) * time.Second):
 			// didn't recieve token in time
 			return nil, fmt.Errorf("exceeded timeout duration")
 		}
 	}
 }
+
 // Open the Approval Url in the users browser
 func (a *App) OpenAuthorizationGrant() {
 	url := a.ApprovalUrl()
 	utils.OpenURL(url)
 }
+
 // Create the OAuth2 token that is used for authentication in the app.
 //
 // The primary usecase for this is reading in a saved token from a database or file.
@@ -258,9 +270,9 @@ func (a *App) OpenAuthorizationGrant() {
 // Then you can load the token into the app via the `LoadTokenDirect()` function.
 func (a *App) createToken(accessToken string, tokenType string, refreshToken string, expiry time.Time) *oauth2.Token {
 	return &oauth2.Token{
-		AccessToken: accessToken,
-		TokenType: tokenType,
+		AccessToken:  accessToken,
+		TokenType:    tokenType,
 		RefreshToken: refreshToken,
-		Expiry: expiry,
+		Expiry:       expiry,
 	}
 }

@@ -6,25 +6,27 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
-	"github.com/jcocozza/cassidy-connector/strava/internal/swagger"
+	"github.com/jcocozza/cassidy-connector/strava/swagger"
 )
 
 // StreamType represents the different types of steams that exist.
 // These are exported from the package.
 type StreamType string
+
 const (
-	Time StreamType = "time" // time stream
-	Distance StreamType = "distance" // distance stream
-	Latlng StreamType = "latlng" // latlng stream
-	Altitude StreamType = "altitude" // altitude stream
+	Time           StreamType = "time"            // time stream
+	Distance       StreamType = "distance"        // distance stream
+	Latlng         StreamType = "latlng"          // latlng stream
+	Altitude       StreamType = "altitude"        // altitude stream
 	VelocitySmooth StreamType = "velocity_smooth" // velocity stream
-	Heartrate StreamType = "heartrate" // heartrate stream
-	Cadence StreamType = "cadence" // cadence stream
-	Watts StreamType = "watts" // watts stream
-	Temp StreamType = "temp" // temp stream
-	Moving StreamType = "moving" // moving stream
-	GradeSmooth StreamType = "grade_smooth" // grade stream
+	Heartrate      StreamType = "heartrate"       // heartrate stream
+	Cadence        StreamType = "cadence"         // cadence stream
+	Watts          StreamType = "watts"           // watts stream
+	Temp           StreamType = "temp"            // temp stream
+	Moving         StreamType = "moving"          // moving stream
+	GradeSmooth    StreamType = "grade_smooth"    // grade stream
 )
+
 // The StravaAPI struct is the primary means of interacting with the strava api.
 //
 // This is the layer of abstraction so that users don't have to directly deal with api calls.
@@ -33,24 +35,28 @@ const (
 type StravaAPI struct {
 	stravaClient *swagger.APIClient
 }
+
 func NewStravaAPI(stravaClient *swagger.APIClient) *StravaAPI {
 	return &StravaAPI{
 		stravaClient: stravaClient,
 	}
 }
+
 // Get the athlete that is logged-in/authenticated
 func (api *StravaAPI) GetAthlete(ctx context.Context) (*swagger.DetailedAthlete, error) {
-    athlete, _, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
-    if err != nil {
-        return nil, err
-    }
-    return &athlete, nil
+	athlete, _, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &athlete, nil
 }
+
 // Get activities. Will cycle through all available pages of data.
 //
 // before and after are times to filter activies by. Both are optional (pass in nil to ignore them)
-// 	- before will filter for activities before a passed time.Time
-//	- after will filter for activities after the passed time.Time
+//   - before will filter for activities before a passed time.Time
+//   - after will filter for activities after the passed time.Time
+//
 // before and after are converted to epoch timestamp integers.
 //
 // perPage is the number of activities per page. (default 30) (max 200)
@@ -73,7 +79,7 @@ func (api *StravaAPI) GetActivities(ctx context.Context, perPage int, before, af
 
 	existsMore := true
 	var page int32 = 1 // page enumeration starts at 1
-	for existsMore { // enumerate until there are no more activities
+	for existsMore {   // enumerate until there are no more activities
 		opts.Page = optional.NewInt32(page)
 		summary, _, err := api.stravaClient.ActivitiesApi.GetLoggedInAthleteActivities(ctx, opts)
 		if err != nil {
@@ -89,6 +95,7 @@ func (api *StravaAPI) GetActivities(ctx context.Context, perPage int, before, af
 	}
 	return summaryActivitylol, nil
 }
+
 // Get a single activity by activity ID
 //
 // `activityID` is the id of the activity
@@ -102,6 +109,7 @@ func (api *StravaAPI) GetActivity(ctx context.Context, activityID int, includeAl
 	}
 	return &activity, nil
 }
+
 // convert a list of StreamType into a list of string
 //
 // this is just a simple way to ensure that users aren't passing weird stream types into the `GetActivityStreams` function
@@ -129,13 +137,15 @@ func validateKeys(keys []StreamType) error {
 	}
 	return nil
 }
+
 // Get the streams for a given activity.
 //
 // `activityID` is the id of the activity
 //
 // `keys` is a list of the kinds of streams you want to get for that activity.
 // Currently, the following keys(stream types) are supported by strava:
-//		- time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, temp, moving, grade_smooth
+//   - time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, temp, moving, grade_smooth
+//
 // Each of these are exported by the package as constant symbols for proper access as StreamType types.
 //
 // This will return a struct containing the desired streams for the activity
