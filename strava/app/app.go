@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/jcocozza/cassidy-connector/strava/app/api"
-	//config "github.com/jcocozza/cassidy-connector/strava/internal"
 	"github.com/jcocozza/cassidy-connector/strava/internal/swagger"
 	"github.com/jcocozza/cassidy-connector/strava/utils"
 
@@ -97,12 +96,7 @@ func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) 
 		AuthorizationReciever: reciever,
 	}
 }
-/*
-// Create the default Cassidy App for those who don't want to create their own strava app
-func CassidyApp(redirectURL string) *App {
-	return NewApp(config.ClientId, config.ClientSecret, redirectURL, config.Scopes)
-}
-*/
+
 // Return the approval url
 func (a *App) ApprovalUrl() string {
 	scopeStr := strings.Join(a.Scopes, ",")
@@ -156,13 +150,19 @@ func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 	a.LoadTokenDirect(&token)
 	return nil
 }
-// Get the authorization code form the url that results from the redirect
-// TODO: Handle denial of permission / error
+// Get the authorization code form the url that results from the redirect.
+// This is written to the AuthorizationReciever channel.
+//
+// If there is an error (e.g. the user denies access permission), write the error to the AuthorizationReciver channel with an "error:" prefix.
 func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract URL parameters here and handle them accordingly
 	code := r.URL.Query().Get("code") // Assuming 'code' is the parameter sent by Strava
-	// fmt.Println(code)
-	a.AuthorizationReciever <- code
+	err := r.URL.Query().Get("error") // if the user denies, the url will send an error "access_denied"
+	if code != "" {
+		a.AuthorizationReciever <- code
+	} else if err != "" {
+		a.AuthorizationReciever <- "error:" + err
+	}
 }
 // Parse a url into its "address:port" and its "url/path"
 //
@@ -187,6 +187,9 @@ func (a *App) StartStravaHttpListener() error {
 }
 // Run this function when you send the user to strava's authorization site.
 //
+// `timeoutDuration` is the time in seconds wait before returning nothing. Use -1 for no timeout duration.
+// If the duration is exceeded throws an error.
+//
 // It will start an http listener that listens on the redirect route provided by your app.
 // Once the user authorizes the app and is redirected, the http ListenAndServe will detect the authorization code and push it to the AuthorizationReciever channel.
 // Finally, the GetAccessTokenFromAuthorizationCode will set the app's token.
@@ -195,7 +198,7 @@ func (a *App) StartStravaHttpListener() error {
 //
 // For lower level control over this process, you can start the HttpListener, await the code in the channel and get the access token separately:
 /*
-go func() {
+	go func() {
 		err := s.App.StartStravaHttpListener()
 		if err != nil {
 			fmt.Println("ListenAndServe: ", err.Error())
@@ -211,8 +214,8 @@ go func() {
 	}
 */
 //
-// TODO: Add a timeout to this
-func (a *App) AwaitInitialToken() (*oauth2.Token, error) {
+func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
+	// start listening in a separate go routine
 	go func() {
 		err := a.StartStravaHttpListener()
 		if err != nil {
@@ -221,12 +224,27 @@ func (a *App) AwaitInitialToken() (*oauth2.Token, error) {
 		}
 	}()
 
-	code := <- a.AuthorizationReciever
-	token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
-	if err != nil {
-		return nil, err
+	if timeoutDuration == -1 {
+		code := <- a.AuthorizationReciever
+		token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
+		if err != nil {
+			return nil, err
+		}
+		return token, nil
+	} else {
+		select {
+		case code := <- a.AuthorizationReciever:
+			// recieved token
+			token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
+			if err != nil {
+				return nil, err
+			}
+			return token, nil
+		case <- time.After(time.Duration(timeoutDuration) * time.Second):
+			// didn't recieve token in time
+			return nil, fmt.Errorf("exceeded timeout duration")
+		}
 	}
-	return token, nil
 }
 // Open the Approval Url in the users browser
 func (a *App) OpenAuthorizationGrant() {

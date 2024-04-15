@@ -2,9 +2,7 @@
 
 The strava package provides a CLI tool for interacting with the strava API.
 Further, the package exposes methods that allow you to develop your own ways to interact with the strava API.
-If you like, you can also work directly with the swagger api call methods for less abstraction.
-
-For each of these interaction methods you can choose to use to work with the strava api through your own strava api app, or the one cassidy provides.
+If you like, you can also work directly with the swagger API call methods for less abstraction.
 
 ## CLI
 The CLI is a relatively easy way to get off the ground and test various things.
@@ -81,6 +79,65 @@ Use "cassidy-strava api [command] --help" for more information about a command.
 ```
 
 Importantly, you must obtain an OAuth2 token to have access to the data. As previously mentioned, this token can either be passed into the CLI directly, or can be stored in a file and loaded through the `--token-path` flag, or via config file specification.
+
+## Interacting with the Strava API programmatically
+All the interaction is governed via the `strava/app` package.
+Create an app in the following way.
+```
+import (
+	"github.com/jcocozza/cassidy-connector/strava/app"
+)
+stravaApp := app.NewApp("client-id", "client-secret", "http://localhost:9999/strava/callback", []string{"activity:read_all"})
+```
+### Authorizing your Strava Application
+Unfortunately, this process is quite involved and takes a great deal of work to set up properly.
+You will need to set up an account and create an API application.
+The process is detailed in the [strava developer docs](https://developers.strava.com/docs/getting-started/).
+
+The app struct directly exposes several methods for facilitating the authentication process for you app..
+```
+stravaApp.OpenAuthorizationGrant() // this opens the approval url in the user's browser
+stravaApp.StartStravaHttpListener() // Listen to the redirect route. Once the user is directed to it, we can extract the token from the url.
+stravaApp.AwaitInitialToken() // Start the listener, push the code to the AuthorizationReciever and get the access token from the authorization code.
+```
+Importantly, the app struct also exposes the `AuthorizationReciever`. This is a string channel (`stravaApp.AuthorizationReciever`).
+If the HttpListener is running, then when the user is redirected to the redirect URL of the strava app (e.g. localhost:9999/strava/exchange) the handler of that route will detect the code from the args of the route and push the code to the channel.
+
+For lower level control over the authentication process, don't use the `AwaitInitialToken()`. Instead, you can leverage some other methods.
+```
+	go func() {
+		err := s.App.StartStravaHttpListener()
+		if err != nil {
+			fmt.Println("ListenAndServe: ", err.Error())
+		}
+	}()
+	code := <-s.App.AuthorizationReciever
+	fmt.Println("GOT CODE:" + code)
+
+	err := s.App.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+```
+
+### Swagger (lower level)
+The swagger client can be accessed from the app struct via the `StravaClient`.
+The methods are described by the routes at the [strava swagger playground](https://developers.strava.com/playground/).
+For example:
+```
+stravaApp.StravaClient.ActivitiesApi.CreateActivity()
+stravaApp.StravaClient.AthletesApi.UpdateLoggedInAthlete()
+```
+
+### Cassidy Wrapper
+Our implementation provides wrapper methods that allow you to easily interact with the Strava API with little hassle.
+These are exposed in the app struct via the `Api`.
+For example:
+```
+stravaApp.Api.GetAthlete()
+stravaApp.Api.GetActivity()
+```
 
 ## IMPORTANT NOTICE
 You may need to change the `LatLng` struct in the `strava/internal/swagger/model_lat_lng.go` file to be a list of `float32` (or `float64`). It appears that the `strava/internal/swagger/make.sh` using `swagger-codegen` generates this improperly.
