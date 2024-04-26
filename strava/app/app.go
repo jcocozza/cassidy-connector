@@ -236,6 +236,11 @@ func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
 
 	if timeoutDuration == -1 {
 		code := <-a.AuthorizationReciever
+
+		if strings.Contains(code, "error") {
+			return nil, fmt.Errorf(code)
+		}
+
 		token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
 		if err != nil {
 			return nil, err
@@ -244,6 +249,9 @@ func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
 	} else {
 		select {
 		case code := <-a.AuthorizationReciever:
+			if strings.Contains(code, "error") {
+				return nil, fmt.Errorf(code)
+			}
 			// recieved token
 			token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
 			if err != nil {
