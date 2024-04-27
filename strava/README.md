@@ -105,12 +105,10 @@ If the HttpListener is running, then when the user is redirected to the redirect
 
 For lower level control over the authentication process, don't use the `AwaitInitialToken()`. Instead, you can leverage some other methods.
 ```
-	go func() {
-		err := s.App.StartStravaHttpListener()
-		if err != nil {
-			fmt.Println("ListenAndServe: ", err.Error())
-		}
-	}()
+	server, err := s.App.StartStravaHttpListener()
+	if err != nil {
+		fmt.Println("ListenAndServe: ", err.Error())
+	}
 	code := <-s.App.AuthorizationReciever
 	fmt.Println("GOT CODE:" + code)
 
@@ -120,6 +118,8 @@ For lower level control over the authentication process, don't use the `AwaitIni
 		return
 	}
 ```
+
+Make sure that the server is shutdown before starting a new one otherwise attempting to listen on the same route will throw an error.
 
 ### Swagger (lower level)
 The swagger client can be accessed from the app struct via the `StravaClient`.

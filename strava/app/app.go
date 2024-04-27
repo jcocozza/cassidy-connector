@@ -64,7 +64,6 @@ type App struct {
 	// This is the primary purpose of this package.
 	Api *api.StravaAPI
 }
-
 // Format the ApprovalUrlFormat
 func generateApprovalUrl(clientId string, redirectUrl string, scopes []string) string {
 	scopeStr := strings.Join(scopes, ",")
@@ -98,13 +97,11 @@ func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) 
 		AuthorizationReciever: reciever,
 	}
 }
-
 // Return the approval url
 func (a *App) ApprovalUrl() string {
 	scopeStr := strings.Join(a.Scopes, ",")
 	return fmt.Sprintf(approvalUrlFormat, a.ClientId, responseType, a.RedirectURL, approvalPrompt, scopeStr)
 }
-
 // This is for the FIRST TIME getting the access token. It will set the token internally to the app.
 //
 // A user will grant permission to the app then will be redirected to the application's RedirectURL.
@@ -119,7 +116,6 @@ func (a *App) GetAccessTokenFromAuthorizationCode(ctx context.Context, code stri
 	a.SwaggerConfig.HTTPClient = httpClient
 	return token, nil
 }
-
 // Turn a json string token into an `oauth2.Token` struct and load it into the app
 func (a *App) LoadTokenString(tokenJsonString string) error {
 	var token oauth2.Token
@@ -132,14 +128,12 @@ func (a *App) LoadTokenString(tokenJsonString string) error {
 	a.SwaggerConfig.HTTPClient = httpClient
 	return nil
 }
-
 // Load an oauth2 token into the app
 func (a *App) LoadTokenDirect(token *oauth2.Token) {
 	httpClient := a.OAuthConfig.Client(context.TODO(), token)
 	a.Token = token
 	a.SwaggerConfig.HTTPClient = httpClient
 }
-
 // Load an oauth2 token into the app from a .json file
 func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 	tokenData, err := os.ReadFile(tokenFilePath)
@@ -156,7 +150,6 @@ func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 	a.LoadTokenDirect(&token)
 	return nil
 }
-
 // Get the authorization code form the url that results from the redirect.
 // This is written to the AuthorizationReciever channel.
 //
@@ -171,7 +164,6 @@ func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		a.AuthorizationReciever <- "error:" + err
 	}
 }
-
 // Parse a url into its "address:port" and its "url/path"
 //
 // e.g. http://localhost:9999/strava/callback -> "localhost:9999", "strava/callback", err
@@ -182,19 +174,26 @@ func parseURL(inputURL string) (string, string, error) {
 	}
 	return parsedURL.Host, parsedURL.Path[1:], nil // [1:] is used to remove the leading '/'
 }
-
 // Listen to the redirect route. Once the user is directed to it, we can extract the token from the url.
-func (a *App) StartStravaHttpListener() error {
+//
+// Returns the Http server instance, so it can be shutdown when you like.
+func (a *App) StartStravaHttpServer() (*http.Server, error) {
 	hostWithPort, path, err := parseURL(a.RedirectURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	//fmt.Println("Running ListenAndServe on: " + hostWithPort + " at path: /" + path)
+	srv := &http.Server{Addr: hostWithPort}
 	http.HandleFunc("/"+path, a.stravaRedirectHandler)
-	return http.ListenAndServe(hostWithPort, nil)
-}
 
+	go func ()  {
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+            // unexpected error. port in use?
+            //fmt.Println("ListenAndServe(): %v", err)
+        }
+	}()
+	return srv, nil
+}
 // Run this function when you send the user to strava's authorization site.
 //
 // `timeoutDuration` is the time in seconds wait before returning nothing. Use -1 for no timeout duration.
@@ -208,12 +207,10 @@ func (a *App) StartStravaHttpListener() error {
 //
 // For lower level control over this process, you can start the HttpListener, await the code in the channel and get the access token separately:
 /*
-	go func() {
-		err := s.App.StartStravaHttpListener()
-		if err != nil {
-			fmt.Println("ListenAndServe: ", err.Error())
-		}
-	}()
+	server, err := a.StartStravaHttpServer()
+	if err != nil {
+		return nil, err
+	}
 	code := <-s.App.AuthorizationReciever
 	fmt.Println("GOT CODE:" + code)
 
@@ -225,52 +222,54 @@ func (a *App) StartStravaHttpListener() error {
 */
 //
 func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
+	ctx := context.TODO()
 	// start listening in a separate go routine
-	go func() {
-		err := a.StartStravaHttpListener()
-		if err != nil {
-			//fmt.Println("ListenAndServe: ", err.Error())
-			return
-		}
-	}()
+	server, err := a.StartStravaHttpServer()
+	if err != nil {
+		return nil, err
+	}
 
 	if timeoutDuration == -1 {
 		code := <-a.AuthorizationReciever
 
 		if strings.Contains(code, "error") {
+			server.Shutdown(ctx)
 			return nil, fmt.Errorf(code)
 		}
-
-		token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
+		token, err := a.GetAccessTokenFromAuthorizationCode(ctx, code)
 		if err != nil {
+			server.Shutdown(ctx)
 			return nil, err
 		}
+		server.Shutdown(ctx)
 		return token, nil
 	} else {
 		select {
 		case code := <-a.AuthorizationReciever:
 			if strings.Contains(code, "error") {
+				server.Shutdown(ctx)
 				return nil, fmt.Errorf(code)
 			}
 			// recieved token
-			token, err := a.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
+			token, err := a.GetAccessTokenFromAuthorizationCode(ctx, code)
 			if err != nil {
+				server.Shutdown(ctx)
 				return nil, err
 			}
+			server.Shutdown(ctx)
 			return token, nil
 		case <-time.After(time.Duration(timeoutDuration) * time.Second):
 			// didn't recieve token in time
+			server.Shutdown(ctx)
 			return nil, fmt.Errorf("exceeded timeout duration")
 		}
 	}
 }
-
 // Open the Approval Url in the users browser
 func (a *App) OpenAuthorizationGrant() {
 	url := a.ApprovalUrl()
 	utils.OpenURL(url)
 }
-
 // Create the OAuth2 token that is used for authentication in the app.
 //
 // The primary usecase for this is reading in a saved token from a database or file.
