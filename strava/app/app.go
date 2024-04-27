@@ -183,8 +183,9 @@ func (a *App) StartStravaHttpServer() (*http.Server, error) {
 		return nil, err
 	}
 
-	srv := &http.Server{Addr: hostWithPort}
-	http.HandleFunc("/"+path, a.stravaRedirectHandler)
+	mux := http.NewServeMux()
+	srv := &http.Server{Addr: hostWithPort, Handler: mux}
+	mux.HandleFunc("/"+path, a.stravaRedirectHandler)
 
 	go func ()  {
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
