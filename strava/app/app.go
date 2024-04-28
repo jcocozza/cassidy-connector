@@ -21,6 +21,7 @@ const (
 	responseType      string = "code"
 	approvalPrompt    string = "force"
 	approvalUrlFormat string = "https://www.strava.com/oauth/authorize?client_id=%s&response_type=%s&redirect_uri=%s&approval_prompt=%s&scope=%s"
+	stravaAppSettings string = "https://www.strava.com/settings/apps"
 )
 
 // An app is a way of interacting with the strava api.
@@ -270,6 +271,12 @@ func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
 func (a *App) OpenAuthorizationGrant() {
 	url := a.ApprovalUrl()
 	utils.OpenURL(url)
+}
+// Open the strava settings page
+//
+// This idea is to make it easy for the users to deauthenticate/revoke access to the app whenever they like.
+func (a *App) OpenStravaAppSettings() {
+	utils.OpenURL(stravaAppSettings)
 }
 // Create the OAuth2 token that is used for authentication in the app.
 //
