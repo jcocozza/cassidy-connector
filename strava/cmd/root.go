@@ -24,7 +24,6 @@ type cfg struct {
 }
 
 // global app flag variables
-//var useCassidyApp bool
 var configPath string
 var tokenPath string
 var token string
@@ -106,8 +105,6 @@ func initConfig() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	//rootCmd.PersistentFlags().BoolVarP(&useCassidyApp, "use-cassidy", "c", false, "include this flag if you want to use the cassidy's strava application as opposed to your own.")
-
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", fmt.Sprintf("the config file of the application. see config.tmpl.json for format. a config is NOT required if you want to pass everything manually. (default is $HOME/%s)", defaultConfig))
 	rootCmd.PersistentFlags().StringVar(&clientId, "client-id", "", "the client id of your strava application")
 	rootCmd.PersistentFlags().StringVar(&clientSecret, "client-secret", "", "the client secret of your strava application")
@@ -117,11 +114,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&outputPath, "path", "f", "", "the path to save successful output to. (will not write errors at this time)")
 
 	rootCmd.MarkFlagsRequiredTogether("client-id", "client-secret")
-	/*
-	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "client-id")
-	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "client-secret")
-	rootCmd.MarkFlagsMutuallyExclusive("use-cassidy", "scopes")
-	*/
 
 	tokenCmdGroup.PersistentFlags().StringVar(&tokenPath, "token-path", "", "the path to a .json file that contains an OAuth2 token. This json must conform to the `oauth2.Token` struct found here: https://pkg.go.dev/golang.org/x/oauth2#Token.")
 	tokenCmdGroup.PersistentFlags().StringVar(&token, "token", "", "a json token. you must include the entire token wrapped in ``. the json token conforms to `oauth2.Token` struct found here: https://pkg.go.dev/golang.org/x/oauth2#Token. (this is an ugly, but can be useful for testing purposes)")

@@ -11,7 +11,7 @@ import (
 // Will open the browser for the stored application in the config file.
 var grantPermission = &cobra.Command{
 	Use: "open-grant",
-	Short: "Open a browser to grant allow for permission granting",
+	Short: "Open a browser to allow for permission granting",
 	Args: cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		stravaApp, err := createApp()

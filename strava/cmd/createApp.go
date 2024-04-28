@@ -8,12 +8,7 @@ import (
 
 // Create the app based on the passed flag settings
 func createApp() (*app.App, error) {
-	var stravaApp *app.App
-	//if useCassidyApp {
-	//	stravaApp = app.CassidyApp(redirectURL)
-	//} else {
-	stravaApp = app.NewApp(clientId, clientSecret, redirectURL, scopes)
-	//}
+	stravaApp := app.NewApp(clientId, clientSecret, redirectURL, scopes)
 	// when we have a token, we want to load it in to the app
 	if tokenPath != "" {
 		err := stravaApp.LoadTokenFromFile(tokenPath)

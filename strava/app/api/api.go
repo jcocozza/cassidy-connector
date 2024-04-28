@@ -35,13 +35,11 @@ const (
 type StravaAPI struct {
 	stravaClient *swagger.APIClient
 }
-
 func NewStravaAPI(stravaClient *swagger.APIClient) *StravaAPI {
 	return &StravaAPI{
 		stravaClient: stravaClient,
 	}
 }
-
 // Get the athlete that is logged-in/authenticated
 func (api *StravaAPI) GetAthlete(ctx context.Context) (*swagger.DetailedAthlete, error) {
 	athlete, _, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
@@ -50,7 +48,6 @@ func (api *StravaAPI) GetAthlete(ctx context.Context) (*swagger.DetailedAthlete,
 	}
 	return &athlete, nil
 }
-
 // Get activities. Will cycle through all available pages of data.
 //
 // before and after are times to filter activies by. Both are optional (pass in nil to ignore them)
@@ -95,7 +92,6 @@ func (api *StravaAPI) GetActivities(ctx context.Context, perPage int, before, af
 	}
 	return summaryActivitylol, nil
 }
-
 // Get a single activity by activity ID
 //
 // `activityID` is the id of the activity
@@ -109,7 +105,6 @@ func (api *StravaAPI) GetActivity(ctx context.Context, activityID int, includeAl
 	}
 	return &activity, nil
 }
-
 // convert a list of StreamType into a list of string
 //
 // this is just a simple way to ensure that users aren't passing weird stream types into the `GetActivityStreams` function
@@ -137,7 +132,6 @@ func validateKeys(keys []StreamType) error {
 	}
 	return nil
 }
-
 // Get the streams for a given activity.
 //
 // `activityID` is the id of the activity

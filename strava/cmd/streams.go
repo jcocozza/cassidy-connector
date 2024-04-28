@@ -55,7 +55,6 @@ time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, te
 }
 func init() {
 	getStreams.Flags().StringSliceVarP(&keys, "stream-types", "t", []string{"time", "distance"}, "a comma separated list of the stream types to get.")
-	//getStreams.MarkFlagRequired("stream-types")
 
 	tokenCmdGroup.AddCommand(getStreams)
 }
