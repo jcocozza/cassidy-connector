@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/jcocozza/cassidy-connector/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +39,7 @@ var initialAccess = &cobra.Command{
 		}
 
 		if outputPath != "" {
-			writeOutput(outputPath, jsonBytes)
+			utils.WriteOutput(outputPath, jsonBytes)
 		}
 		fmt.Println(string(jsonBytes))
 	},
@@ -57,7 +58,7 @@ var approvalUrl = &cobra.Command{
 		url := stravaApp.ApprovalUrl()
 
 		if outputPath != "" {
-			writeOutput(outputPath, []byte(url))
+			utils.WriteOutput(outputPath, []byte(url))
 		}
 		fmt.Println(url)
 	},
