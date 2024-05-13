@@ -59,7 +59,7 @@ var getActivities = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(getActivities)
+	RootCmd.AddCommand(getActivities)
 
 	getActivities.Flags().StringVarP(&start, "start", "s", "", fmt.Sprintf("Filter to only include activities after this date. Must be of the format: %s", layoutInterpretation))
 	getActivities.Flags().StringVarP(&end, "end", "e", "", fmt.Sprintf("Filter to only include activities before this date. Must be of the format: %s", layoutInterpretation))

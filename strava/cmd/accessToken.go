@@ -65,6 +65,6 @@ var approvalUrl = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(initialAccess)
-	rootCmd.AddCommand(approvalUrl)
+	RootCmd.AddCommand(initialAccess)
+	RootCmd.AddCommand(approvalUrl)
 }

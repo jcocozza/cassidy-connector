@@ -36,5 +36,5 @@ var authenticate = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(authenticate)
+	RootCmd.AddCommand(authenticate)
 }

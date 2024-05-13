@@ -25,5 +25,5 @@ var grantPermission = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(grantPermission)
+	RootCmd.AddCommand(grantPermission)
 }
