@@ -18,6 +18,7 @@ var password string
 
 var rootCmd = &cobra.Command{
 	Use: "cassidy-final-surge",
+	Long: "warning: This is a 'back-engineered' tool. It can break at any time for pretty much any reason because Final Surge does not expose any standard procedures for users",
 	Version: version,
 	Run: func(cmd *cobra.Command, args []string) {},
 }
@@ -25,7 +26,6 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVar(&email, "email", "", "your final surge email")
 	rootCmd.PersistentFlags().StringVar(&password, "password", "", "your final surge password")
-
 
 	rootCmd.PersistentFlags().StringVarP(&outputPath, "path", "f", "", "the path to save successful output to. (will not write errors at this time)")
 }

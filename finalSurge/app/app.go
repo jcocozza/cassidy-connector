@@ -75,39 +75,8 @@ func (a *App) Authenticate(ctx context.Context) (*AuthResponse, error) {
 	}
 	return &authResp, nil
 }
-/*
-func (a *App) GetActivities(ctx context.Context, scopeKey, userToken string, startDate, endDate time.Time) ([]byte, error) {
-	activityPayload := map[string]string{
-		"scope": "USER",
-		"scopekey": scopeKey,
-		"startdate": startDate.Format("2006-01-02"),
-		"enddate": endDate.Format("2006-01-02"),
-	}
-
-	jsonPayload, _ := json.Marshal(activityPayload)
-	req, err := http.NewRequestWithContext(ctx, "GET", activitiesUrl, bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create auth request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", userToken))
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-
-	responseData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return responseData, nil
-}
-*/
-
-
-func (a *App) GetActivities(ctx context.Context, userToken, scopeKey string, startDate, endDate time.Time) ([]byte, error) {
+// Get activities between start and end date
+func (a *App) GetActivities(ctx context.Context, userToken, scopeKey string, startDate, endDate time.Time) (*WorkoutListResponse, error) {
 	headers := map[string]string{
 		"Authorization": fmt.Sprintf("Bearer %s", userToken),
 	}
@@ -135,7 +104,6 @@ func (a *App) GetActivities(ctx context.Context, userToken, scopeKey string, sta
 		q.Add(key, value)
 	}
 	req.URL.RawQuery = q.Encode()
-	fmt.Println(req.URL)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -147,5 +115,11 @@ func (a *App) GetActivities(ctx context.Context, userToken, scopeKey string, sta
 	if err != nil {
 		return nil, err
 	}
-	return responseData, nil
+
+	var workoutListResponse WorkoutListResponse
+	err1 := json.Unmarshal(responseData, &workoutListResponse)
+	if err1 != nil {
+		return nil, err1
+	}
+	return &workoutListResponse, nil
 }

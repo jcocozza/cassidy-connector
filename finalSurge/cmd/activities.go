@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/jcocozza/cassidy-connector/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +45,16 @@ var getActivities = &cobra.Command{
 			return
 		}
 
-		fmt.Println(string(activities))
+		activitiesBytes, err := json.Marshal(activities)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		if outputPath != "" {
+		 	utils.WriteOutput(outputPath, activitiesBytes)
+		}
+		fmt.Println(string(activitiesBytes))
 	},
 }
 
