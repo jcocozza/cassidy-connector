@@ -52,7 +52,11 @@ var getActivities = &cobra.Command{
 		}
 
 		if outputPath != "" {
-		 	utils.WriteOutput(outputPath, activitiesBytes)
+            err := utils.WriteOutput(outputPath, activitiesBytes)
+            if err != nil {
+                fmt.Println(err.Error())
+                return
+            }
 		}
 		fmt.Println(string(activitiesBytes))
 	},
