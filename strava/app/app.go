@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 	"time"
-    "runtime"
 
 	"github.com/jcocozza/cassidy-connector/strava/app/api"
 	"github.com/jcocozza/cassidy-connector/strava/swagger"
