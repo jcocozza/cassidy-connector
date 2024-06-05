@@ -15,7 +15,8 @@ func OpenURL(url string) error {
     case "darwin":
         cmd = exec.Command("open", url)
     case "windows":
-        cmd = exec.Command("cmd", "/c", "start", url)
+        //cmd = exec.Command("cmd", "/c", "start", url)
+        cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
     default:
         return fmt.Errorf("unsupported operating system")
     }

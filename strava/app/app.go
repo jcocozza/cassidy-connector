@@ -22,7 +22,7 @@ const (
 	responseType      string = "code"
 	approvalPrompt    string = "force"
 	approvalUrlFormat        string = "https://www.strava.com/oauth/authorize?client_id=%s&response_type=%s&redirect_uri=%s&approval_prompt=%s&scope=%s"
-    windowsApprovalUrlFormat string = "https://www.strava.com/oauth/authorize?client_id=%s^&response_type=%s^&redirect_uri=%s^&approval_prompt=%s^&scope=%s"
+    //windowsApprovalUrlFormat string = "https://www.strava.com/oauth/authorize?client_id=%s^&response_type=%s^&redirect_uri=%s^&approval_prompt=%s^&scope=%s"
 	stravaAppSettings string = "https://www.strava.com/settings/apps"
 )
 
@@ -70,12 +70,7 @@ type App struct {
 // Format the ApprovalUrlFormat
 func generateApprovalUrl(clientId string, redirectUrl string, scopes []string) string {
 	scopeStr := strings.Join(scopes, ",")
-    switch runtime.GOOS {
-        case "windows":
-	        return fmt.Sprintf(windowsApprovalUrlFormat, clientId, responseType, redirectUrl, approvalPrompt, scopeStr)
-        default:
-	        return fmt.Sprintf(approvalUrlFormat, clientId, responseType, redirectUrl, approvalPrompt, scopeStr)
-    }
+	return fmt.Sprintf(approvalUrlFormat, clientId, responseType, redirectUrl, approvalPrompt, scopeStr)
 }
 func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) *App {
 	approvalUrl := generateApprovalUrl(clientId, redirectURL, scopes)
