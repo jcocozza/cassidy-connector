@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/jcocozza/cassidy-connector/strava/app"
 )
 
@@ -23,8 +21,4 @@ func createApp() (*app.App, error) {
 	}
 
 	return stravaApp, nil
-}
-// write a slice of bytes to a file
-func writeOutput(filePath string, content []byte) error {
-	return os.WriteFile(filePath, content, 0644)
 }

@@ -33,7 +33,7 @@ var redirectURL string
 var scopes []string
 var outputPath string
 
-var rootCmd = &cobra.Command{
+var RootCmd = &cobra.Command{
 	Use:   "cassidy-strava",
 	Version: version,
 	Short: "cassidy-strava is a cli tool to interact with the Strava API",
@@ -85,17 +85,17 @@ func initConfig() {
 
 	// set the relevant flags based on what the config provides
 	if config.ClientId != "" {
-		rootCmd.Flags().Set("client-id", config.ClientId)
+		RootCmd.Flags().Set("client-id", config.ClientId)
 	}
 	if config.ClientSecret != "" {
-		rootCmd.Flags().Set("client-secret", config.ClientSecret)
+		RootCmd.Flags().Set("client-secret", config.ClientSecret)
 	}
 	if config.RedirectURL != "" {
-		rootCmd.Flags().Set("redirect-url", config.RedirectURL)
+		RootCmd.Flags().Set("redirect-url", config.RedirectURL)
 	}
 	if len(config.Scopes) > 0 {
 		scopeStr := strings.Join(config.Scopes, ",")
-		rootCmd.Flags().Set("scopes", scopeStr)
+		RootCmd.Flags().Set("scopes", scopeStr)
 	}
 	if config.TokenPath != "" {
 		tokenCmdGroup.Flags().Set("token-path", config.TokenPath)
@@ -105,25 +105,25 @@ func initConfig() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", fmt.Sprintf("the config file of the application. see config.tmpl.json for format. a config is NOT required if you want to pass everything manually. (default is $HOME/%s)", defaultConfig))
-	rootCmd.PersistentFlags().StringVar(&clientId, "client-id", "", "the client id of your strava application")
-	rootCmd.PersistentFlags().StringVar(&clientSecret, "client-secret", "", "the client secret of your strava application")
-	rootCmd.PersistentFlags().StringVar(&redirectURL, "redirect-url", "http://localhost/exchange_token", "the redirect url of your strava application")
-	rootCmd.PersistentFlags().StringSliceVar(&scopes, "scopes", []string{"activity:read_all"}, "the scope requirement of your strava application")
+	RootCmd.PersistentFlags().StringVar(&configPath, "config", "", fmt.Sprintf("the config file of the application. see config.tmpl.json for format. a config is NOT required if you want to pass everything manually. (default is $HOME/%s)", defaultConfig))
+	RootCmd.PersistentFlags().StringVar(&clientId, "client-id", "", "the client id of your strava application")
+	RootCmd.PersistentFlags().StringVar(&clientSecret, "client-secret", "", "the client secret of your strava application")
+	RootCmd.PersistentFlags().StringVar(&redirectURL, "redirect-url", "http://localhost/exchange_token", "the redirect url of your strava application")
+	RootCmd.PersistentFlags().StringSliceVar(&scopes, "scopes", []string{"activity:read_all"}, "the scope requirement of your strava application")
 
-	rootCmd.PersistentFlags().StringVarP(&outputPath, "path", "f", "", "the path to save successful output to. (will not write errors at this time)")
+	RootCmd.PersistentFlags().StringVarP(&outputPath, "path", "f", "", "the path to save successful output to. (will not write errors at this time)")
 
-	rootCmd.MarkFlagsRequiredTogether("client-id", "client-secret")
+	RootCmd.MarkFlagsRequiredTogether("client-id", "client-secret")
 
 	tokenCmdGroup.PersistentFlags().StringVar(&tokenPath, "token-path", "", "the path to a .json file that contains an OAuth2 token. This json must conform to the `oauth2.Token` struct found here: https://pkg.go.dev/golang.org/x/oauth2#Token.")
 	tokenCmdGroup.PersistentFlags().StringVar(&token, "token", "", "a json token. you must include the entire token wrapped in ``. the json token conforms to `oauth2.Token` struct found here: https://pkg.go.dev/golang.org/x/oauth2#Token. (this is an ugly, but can be useful for testing purposes)")
 	tokenCmdGroup.MarkFlagsMutuallyExclusive("token-path", "token")
 	tokenCmdGroup.MarkFlagsOneRequired("token", "token-path")
 
-	rootCmd.AddCommand(tokenCmdGroup)
+	RootCmd.AddCommand(tokenCmdGroup)
 }
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := RootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

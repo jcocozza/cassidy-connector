@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jcocozza/cassidy-connector/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +58,7 @@ var getActivities = &cobra.Command{
 
 
 		if outputPath != "" {
-			writeOutput(outputPath, activitiesJsonBytes)
+			utils.WriteOutput(outputPath, activitiesJsonBytes)
 		}
 		fmt.Println(string(activitiesJsonBytes))
 	},
