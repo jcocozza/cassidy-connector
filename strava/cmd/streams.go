@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/jcocozza/cassidy-connector/strava/app/api"
+	"github.com/jcocozza/cassidy-connector/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -48,7 +49,7 @@ time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, te
 		}
 
 		if outputPath != "" {
-			writeOutput(outputPath, streamJsonBytes)
+			utils.WriteOutput(outputPath, streamJsonBytes)
 		}
 		fmt.Println(string(streamJsonBytes))
 	},

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/jcocozza/cassidy-connector/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +32,7 @@ var getAthlete = &cobra.Command{
 		}
 
 		if outputPath != "" {
-			writeOutput(outputPath, athleteJsonBytes)
+			utils.WriteOutput(outputPath, athleteJsonBytes)
 		}
 		fmt.Println(string(athleteJsonBytes))
 	},
