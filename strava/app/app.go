@@ -26,6 +26,10 @@ const (
 	approvalUrlFormat       string = "https://www.strava.com/oauth/authorize?client_id=%s&response_type=%s&redirect_uri=%s&approval_prompt=%s&scope=%s"
 	stravaAppSettings       string = "https://www.strava.com/settings/apps"
 	webhookSubscriptionsURL string = "https://www.strava.com/api/v3/push_subscriptions"
+
+	AspectTypeCreate string = "create"
+	AspectTypeUpdate string = "update"
+	AspectTypeDelete string = "delete"
 )
 
 // A StravaEvent is an event that is sent from the webhook
@@ -101,6 +105,19 @@ type App struct {
 	//
 	// *IMPORTANT* this will be called asynchronously with a go func
 	// the strava webhook wants a response in less then 2 seconds so all events need to be handled asynchronously
+	//
+	// A basic WebhookEventHandler might look like:
+	//
+	//func stravaEventHandler(se app.StravaEvent) {
+	//	switch se.AspectType {
+	//	case AspectTypeCreate:
+	//		fmt.Println("creating")
+	//	case AspectTypeUpdate:
+	//		fmt.Println("updating")
+	//	case AspectTypeDelete:
+	//		fmt.Println("deleteing")
+	//	}
+	//}
 	WebhookEventHandler func(StravaEvent)
 	// This is where the data methods are called from.
 	// It is a layer of abstraction to simplify making calls to the strava API.
@@ -246,7 +263,6 @@ func (a *App) StartStravaHttpServer() (*http.Server, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	mux := http.NewServeMux()
 	srv := &http.Server{Addr: hostWithPort, Handler: mux}
 	mux.HandleFunc("/"+path, a.stravaRedirectHandler)
@@ -404,7 +420,6 @@ func (a *App) webhookRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			fmt.Println("no event handler defined. doing nothing.")
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 	default:
