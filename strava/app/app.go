@@ -41,7 +41,8 @@ type StravaEvent struct {
 	// either "create", "update" or "delete"
 	AspectType string `json:"aspect_type"`
 	// only for AspectType = "update"
-	Updates string `json:"updates"`
+	// possible keys: "title", "type", "private", "authorized"
+	Updates map[string]string `json:"updates"`
 	// athlete's id
 	OwnerID int `json:"owner_id"`
 	// push subscription id receiving the event
@@ -341,6 +342,7 @@ func (a *App) OpenStravaAppSettings() {
 // this handler does a great deal of work
 //
 // When a get request is make, (that is creating a subscription to the webhook):
+//
 //	must respond within 2 seconds to the get request from strava
 //	per https://developers.strava.com/docs/webhooks/ it must repond with http status 200 and the hub.challenge
 //	once this happens the original webhook POST request will receive a response
@@ -368,7 +370,6 @@ func (a *App) webhookRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		defer r.Body.Close()
 		body, err := io.ReadAll(r.Body)
-		fmt.Println(string(body))
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -439,7 +440,6 @@ func (a *App) CreateSubscription() (int, *http.Server, *sync.WaitGroup, error) {
 	// once this happens, strava has confirmed the webhook, so we are now expecting the response
 	_ = <-a.WebhookReciever
 	body, err := io.ReadAll(resp.Body)
-	fmt.Println(string(body))
 	if err != nil {
 		wg.Done()
 		return -1, nil, nil, err
