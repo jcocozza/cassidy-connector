@@ -6,7 +6,7 @@ import (
 
 // Create the app based on the passed flag settings
 func createApp() (*app.App, error) {
-	stravaApp := app.NewApp(clientId, clientSecret, redirectURL, scopes)
+	stravaApp := app.NewApp(clientId, clientSecret, redirectURL, authorizationCallbackDomain, webhookServerURL, webhookVerifyToken, scopes)
 	// when we have a token, we want to load it in to the app
 	if tokenPath != "" {
 		err := stravaApp.LoadTokenFromFile(tokenPath)

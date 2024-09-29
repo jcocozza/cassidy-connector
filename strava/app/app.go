@@ -1,13 +1,16 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jcocozza/cassidy-connector/strava/app/api"
@@ -18,12 +21,30 @@ import (
 )
 
 const (
-	responseType      string = "code"
-	approvalPrompt    string = "force"
-	approvalUrlFormat        string = "https://www.strava.com/oauth/authorize?client_id=%s&response_type=%s&redirect_uri=%s&approval_prompt=%s&scope=%s"
-    //windowsApprovalUrlFormat string = "https://www.strava.com/oauth/authorize?client_id=%s^&response_type=%s^&redirect_uri=%s^&approval_prompt=%s^&scope=%s"
-	stravaAppSettings string = "https://www.strava.com/settings/apps"
+	responseType            string = "code"
+	approvalPrompt          string = "force"
+	approvalUrlFormat       string = "https://www.strava.com/oauth/authorize?client_id=%s&response_type=%s&redirect_uri=%s&approval_prompt=%s&scope=%s"
+	stravaAppSettings       string = "https://www.strava.com/settings/apps"
+	webhookSubscriptionsURL string = "https://www.strava.com/api/v3/push_subscriptions"
 )
+
+// A StravaEvent is an event that is sent from the webhook
+type StravaEvent struct {
+	// either "activity" or "athlete"
+	ObjectType string `json:"object_type"`
+	// activity id or athlete id based on ObjectType
+	ObjectID int `json:"object_id"`
+	// either "create", "update" or "delete"
+	AspectType string `json:"aspect_type"`
+	// only for AspectType = "update"
+	Updates string `json:"updates"`
+	// athlete's id
+	OwnerID int `json:"owner_id"`
+	// push subscription id receiving the event
+	SubscriptionID int `json:"subscription_id"`
+	// time that the event occured
+	EventTime int `json:"event_time"`
+}
 
 // An app is a way of interacting with the strava api.
 //
@@ -42,7 +63,20 @@ type App struct {
 	ClientId     string
 	ClientSecret string
 	RedirectURL  string
-	Scopes       []string
+	// note that this must be a publicly accessible url otherwise Strava cannot make the challenge request to it
+	//
+	// this must also be set in your strava application
+	// see strava.com/settings/api then press edit.
+	// this should be the "Authorization Callback Domain"
+	AuthorizationCallbackDomain string
+	// where you want the webserver to run for the webhooks e.g. http://localhost:8086
+	//
+	// Traffic from AuthorizationCallbackDomain should be routed to this server
+	WebhookServerURL   string
+	// Token to verify that data coming from the webhook is what you expect it to be
+	// Can just be a random string
+	WebhookVerifyToken string
+	Scopes             []string
 	// OAuthConfig handles OAuth and creates the HTTPClient that is used to make requests for the StravaClient
 	OAuthConfig *oauth2.Config
 	// The SwaggerConfig is passed into the creation of the StravaClient.
@@ -61,17 +95,27 @@ type App struct {
 	// A way to get the authorization token from the intial authorization process
 	// Any calls to the stravaRedirectHandler will push the authorization code to the AuthorizationReciver channel.
 	AuthorizationReciever chan string
+	// this ensures that the webhook GET request from strava completes before we move forward
+	WebhookReciever chan string
+	// optional; a user defined function that tells the api how to handle new events
+	//
+	// *IMPORTANT* this will be called asynchronously with a go func
+	// the strava webhook wants a response in less then 2 seconds so all events need to be handled asynchronously
+	WebhookEventHandler func(StravaEvent)
 	// This is where the data methods are called from.
 	// It is a layer of abstraction to simplify making calls to the strava API.
 	// This is the primary purpose of this package.
 	Api *api.StravaAPI
 }
+
 // Format the ApprovalUrlFormat
 func generateApprovalUrl(clientId string, redirectUrl string, scopes []string) string {
 	scopeStr := strings.Join(scopes, ",")
 	return fmt.Sprintf(approvalUrlFormat, clientId, responseType, redirectUrl, approvalPrompt, scopeStr)
 }
-func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) *App {
+
+// note that authorizationCallbackDomain, webhookServerURL, and webhookVerifyToken can be empty strings if you aren't interested in webhooks
+func NewApp(clientId string, clientSecret, redirectURL string, authorizationCallbackDomain string, webhookServerURL string, webhookVerifyToken string, webhookEventHandler func(StravaEvent), scopes []string) *App {
 	approvalUrl := generateApprovalUrl(clientId, redirectURL, scopes)
 	oauthCfg := &oauth2.Config{
 		ClientID:     clientId,
@@ -86,24 +130,31 @@ func NewApp(clientId string, clientSecret, redirectURL string, scopes []string) 
 	cfg := swagger.NewConfiguration()
 	client := swagger.NewAPIClient(cfg)
 	reciever := make(chan string)
+	webhookReciever := make(chan string, 1)
 	return &App{
-		ClientId:     clientId,
-		ClientSecret: clientSecret,
-		RedirectURL:  redirectURL,
-		Scopes:       scopes,
-
-		SwaggerConfig:         cfg,
-		OAuthConfig:           oauthCfg,
-		StravaClient:          client,
-		Api:                   api.NewStravaAPI(client),
-		AuthorizationReciever: reciever,
+		ClientId:                    clientId,
+		ClientSecret:                clientSecret,
+		RedirectURL:                 redirectURL,
+		AuthorizationCallbackDomain: authorizationCallbackDomain,
+		WebhookServerURL:            webhookServerURL,
+		WebhookVerifyToken:          webhookVerifyToken,
+		WebhookReciever:             webhookReciever,
+		WebhookEventHandler: 		 webhookEventHandler,
+		Scopes:                      scopes,
+		SwaggerConfig:               cfg,
+		OAuthConfig:                 oauthCfg,
+		StravaClient:                client,
+		Api:                         api.NewStravaAPI(client),
+		AuthorizationReciever:       reciever,
 	}
 }
+
 // Return the approval url
 func (a *App) ApprovalUrl() string {
 	scopeStr := strings.Join(a.Scopes, ",")
 	return fmt.Sprintf(approvalUrlFormat, a.ClientId, responseType, a.RedirectURL, approvalPrompt, scopeStr)
 }
+
 // This is for the FIRST TIME getting the access token. It will set the token internally to the app.
 //
 // A user will grant permission to the app then will be redirected to the application's RedirectURL.
@@ -118,6 +169,7 @@ func (a *App) GetAccessTokenFromAuthorizationCode(ctx context.Context, code stri
 	a.SwaggerConfig.HTTPClient = httpClient
 	return token, nil
 }
+
 // Turn a json string token into an `oauth2.Token` struct and load it into the app
 func (a *App) LoadTokenString(tokenJsonString string) error {
 	var token oauth2.Token
@@ -130,28 +182,29 @@ func (a *App) LoadTokenString(tokenJsonString string) error {
 	a.SwaggerConfig.HTTPClient = httpClient
 	return nil
 }
+
 // Load an oauth2 token into the app
 func (a *App) LoadTokenDirect(token *oauth2.Token) {
 	httpClient := a.OAuthConfig.Client(context.TODO(), token)
 	a.Token = token
 	a.SwaggerConfig.HTTPClient = httpClient
 }
+
 // Load an oauth2 token into the app from a .json file
 func (a *App) LoadTokenFromFile(tokenFilePath string) error {
 	tokenData, err := os.ReadFile(tokenFilePath)
 	if err != nil {
 		return err
 	}
-
 	var token oauth2.Token
 	err = json.Unmarshal(tokenData, &token)
 	if err != nil {
 		return err
 	}
-
 	a.LoadTokenDirect(&token)
 	return nil
 }
+
 // Get the authorization code form the url that results from the redirect.
 // This is written to the AuthorizationReciever channel.
 //
@@ -166,6 +219,7 @@ func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		a.AuthorizationReciever <- "error:" + err
 	}
 }
+
 // Parse a url into its "address:port" and its "url/path"
 //
 // e.g. http://localhost:9999/strava/callback -> "localhost:9999", "strava/callback", err
@@ -174,8 +228,16 @@ func parseURL(inputURL string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	return parsedURL.Host, parsedURL.Path[1:], nil // [1:] is used to remove the leading '/'
+	if len(parsedURL.Path) > 0 {
+		if string(parsedURL.Path[0]) == "/" {
+			return parsedURL.Host, parsedURL.Path[1:], nil // [1:] is used to remove the leading '/'
+		}
+		return parsedURL.Host, parsedURL.Path, nil
+	} else {
+		return parsedURL.Host, parsedURL.Path, nil
+	}
 }
+
 // Listen to the redirect route. Once the user is directed to it, we can extract the token from the url.
 //
 // Returns the Http server instance, so it can be shutdown when you like.
@@ -188,15 +250,15 @@ func (a *App) StartStravaHttpServer() (*http.Server, error) {
 	mux := http.NewServeMux()
 	srv := &http.Server{Addr: hostWithPort, Handler: mux}
 	mux.HandleFunc("/"+path, a.stravaRedirectHandler)
-
-	go func ()  {
+	go func() {
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-            // unexpected error. port in use?
-            //fmt.Println("ListenAndServe(): %v", err)
-        }
+			// unexpected error. port in use?
+			//fmt.Println("ListenAndServe(): %v", err)
+		}
 	}()
 	return srv, nil
 }
+
 // Run this function when you send the user to strava's authorization site.
 //
 // `timeoutDuration` is the time in seconds wait before returning nothing. Use -1 for no timeout duration.
@@ -216,7 +278,6 @@ func (a *App) StartStravaHttpServer() (*http.Server, error) {
 	}
 	code := <-s.App.AuthorizationReciever
 	fmt.Println("GOT CODE:" + code)
-
 	err := s.App.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -231,10 +292,8 @@ func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if timeoutDuration == -1 {
 		code := <-a.AuthorizationReciever
-
 		if strings.Contains(code, "error") {
 			server.Shutdown(ctx)
 			return nil, fmt.Errorf(code)
@@ -268,17 +327,20 @@ func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
 		}
 	}
 }
+
 // Open the Approval Url in the users browser
 func (a *App) OpenAuthorizationGrant() {
 	url := a.ApprovalUrl()
 	utils.OpenURL(url)
 }
+
 // Open the strava settings page
 //
 // This idea is to make it easy for the users to deauthenticate/revoke access to the app whenever they like.
 func (a *App) OpenStravaAppSettings() {
 	utils.OpenURL(stravaAppSettings)
 }
+
 // Create the OAuth2 token that is used for authentication in the app.
 //
 // The primary usecase for this is reading in a saved token from a database or file.
@@ -291,4 +353,195 @@ func (a *App) createToken(accessToken string, tokenType string, refreshToken str
 		RefreshToken: refreshToken,
 		Expiry:       expiry,
 	}
+}
+
+// this handler does a great deal of work
+//
+// When a get request is made, that is creating a subscription to the webhook:
+//
+//	must respond within 2 seconds to the get request from strava
+//	per https://developers.strava.com/docs/webhooks/ it must repond with http status 200 and the hub.challenge
+//	once this happens the original webhook POST request will receive a response
+//
+// When a post request is made, we are asking the webhook for new events
+func (a *App) webhookRedirectHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		challenge := r.URL.Query().Get("hub.challenge")
+		verificationToken := r.URL.Query().Get("hub.verify_token")
+		// if the verification token is not the same as when we created the subscription then we are not receiving the correct response
+		if verificationToken != a.WebhookVerifyToken {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		response, err := json.Marshal(map[string]string{"hub.challenge": challenge})
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(response)
+		a.WebhookReciever <- challenge // send the challenge to let the main request to read the post
+	case http.MethodPost:
+		defer r.Body.Close()
+		body, err := io.ReadAll(r.Body)
+		fmt.Println(string(body))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		se := StravaEvent{}
+		err = json.Unmarshal(body, &se)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if a.WebhookEventHandler != nil {
+			go func() {
+				a.WebhookEventHandler(se)
+			}()
+		} else {
+			fmt.Println("no event handler defined. doing nothing.")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+}
+
+// this is a one time run allowing you to subscribe to strava webhooks
+// returns:
+//   - the subscription id and the server that will be called to get events
+//   - the created server
+//   - a wait group. by calling wg.Wait() you keep the server running until it is explicitly stopped.
+//
+// note that the AuthorizationCallbackDomain MUST be open to the internet otherwise strava cannot send information to the server
+func (a *App) CreateSubscription() (int, *http.Server, *sync.WaitGroup, error) {
+	srv, wg, err := a.LaunchWebhookServer()
+	if err != nil {
+		wg.Done()
+		return -1, nil, nil, err
+	}
+	// the subscription process will return a challence to the callback url
+	// as such we need to be listening for that before we make the request
+	// make sure that the server is running
+	time.Sleep(1 * time.Second)
+	payload := map[string]string{
+		"client_id":     a.ClientId,
+		"client_secret": a.ClientSecret,
+		"callback_url":  a.AuthorizationCallbackDomain,
+		"verify_token":  a.WebhookVerifyToken,
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		wg.Done()
+		return -1, nil, nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, webhookSubscriptionsURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		wg.Done()
+		return -1, nil, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		wg.Done()
+		return -1, nil, nil, err
+	}
+	defer resp.Body.Close()
+	// wait for the webhook verification challege to complete
+	// once this happens, strava has confirmed the webhook, so we are now expecting the response
+	_ = <-a.WebhookReciever
+	body, err := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
+	if err != nil {
+		wg.Done()
+		return -1, nil, nil, err
+	}
+	type subscriptionResponse struct {
+		Id int `json:"id"`
+	}
+	sr := subscriptionResponse{}
+	err = json.Unmarshal(body, &sr)
+	if err != nil {
+		wg.Done()
+		return -1, nil, nil, err
+	}
+	return sr.Id, srv, wg, nil
+}
+
+// spawns a server with 2 routes:
+//  1. the path specified by the AuthorizationCallbackDomain which will process events
+//  2. /status which will return "alive" if the server is alive
+//
+// returns:
+//   - the created server
+//   - a wait group. by calling wg.Wait() you keep the server running until it is explicitly stopped.
+func (a *App) LaunchWebhookServer() (*http.Server, *sync.WaitGroup, error) {
+	_, path, err := parseURL(a.AuthorizationCallbackDomain)
+	if err != nil {
+		return nil, nil, err
+	}
+	hostWithPort, _, err := parseURL(a.WebhookServerURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/"+path, a.webhookRedirectHandler)
+	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("alive")) })
+	srv := &http.Server{Addr: hostWithPort, Handler: mux}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			// unexpected error. port in use?
+			fmt.Printf("ListenAndServe(): %v\n", err)
+		}
+	}()
+	return srv, wg, nil
+}
+
+// view the subscription associated with your client id/client secret
+// right now, just prints the response
+func (a *App) ViewSubscription() error {
+	url := fmt.Sprintf(webhookSubscriptionsURL+"?client_id=%s&client_secret=%s", a.ClientId, a.ClientSecret)
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	// TODO: struct-ify the response
+	fmt.Println(string(body))
+	return nil
+}
+
+// delete the subscription associated with your client id/client secret
+func (a *App) DeleteSubscription(subscriptionID string) error {
+	url := fmt.Sprintf(webhookSubscriptionsURL+"/%s?client_id=%s&client_secret=%s", subscriptionID, a.ClientId, a.ClientSecret)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	// TODO: struct-ify the response
+	fmt.Println(string(body))
+	return nil
 }
