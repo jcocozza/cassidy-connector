@@ -2,13 +2,18 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/antihax/optional"
 	"github.com/jcocozza/cassidy-connector/strava/swagger"
 	"golang.org/x/oauth2"
 )
+
+// if the strava api returns 404 not found, will throw this error
+var NotFoundError = errors.New("Object not found")
 
 // StreamType represents the different types of steams that exist.
 // These are exported from the package.
@@ -55,6 +60,8 @@ func (us *userSession) AuthorizationContext(parent context.Context) context.Cont
 // This is the layer of abstraction so that users don't have to directly deal with api calls.
 //
 // It will handle methods related to data in the strava api. (auth will be handled by the broader app struct)
+//
+// Whenever possible, this will throw the NotFoundError when the underlying strava api returns a 404
 type StravaAPI struct {
 	stravaClient *swagger.APIClient
 }
@@ -69,7 +76,10 @@ func NewStravaAPI(stravaClient *swagger.APIClient) *StravaAPI {
 func (api *StravaAPI) GetAthlete(ctx context.Context, token *oauth2.Token) (*swagger.DetailedAthlete, error) {
 	us := &userSession{tkn: token}
 	ctx = us.AuthorizationContext(ctx)
-	athlete, _, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
+	athlete, resp, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, NotFoundError
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +140,10 @@ func (api *StravaAPI) GetActivity(ctx context.Context, token *oauth2.Token, acti
 	us := &userSession{tkn: token}
 	ctx = us.AuthorizationContext(ctx)
 	opts := &swagger.ActivitiesApiGetActivityByIdOpts{IncludeAllEfforts: optional.NewBool(includeAllEfforts)}
-	activity, _, err := api.stravaClient.ActivitiesApi.GetActivityById(ctx, int64(activityID), opts)
+	activity, resp, err := api.stravaClient.ActivitiesApi.GetActivityById(ctx, int64(activityID), opts)
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, NotFoundError
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +197,10 @@ func (api *StravaAPI) GetActivityStreams(ctx context.Context, token *oauth2.Toke
 		return nil, err
 	}
 	keyList := convertKeys(keys)
-	streamSet, _, err := api.stravaClient.StreamsApi.GetActivityStreams(ctx, int64(activityID), keyList, keyByType)
+	streamSet, resp, err := api.stravaClient.StreamsApi.GetActivityStreams(ctx, int64(activityID), keyList, keyByType)
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, NotFoundError
+	}
 	if err != nil {
 		return nil, err
 	}
