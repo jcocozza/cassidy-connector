@@ -73,6 +73,8 @@ type App struct {
 	//
 	// Traffic from AuthorizationCallbackDomain should be routed to this server
 	WebhookServerURL   string
+	// Token to verify that data coming from the webhook is what you expect it to be
+	// Can just be a random string
 	WebhookVerifyToken string
 	Scopes             []string
 	// OAuthConfig handles OAuth and creates the HTTPClient that is used to make requests for the StravaClient
@@ -112,8 +114,8 @@ func generateApprovalUrl(clientId string, redirectUrl string, scopes []string) s
 	return fmt.Sprintf(approvalUrlFormat, clientId, responseType, redirectUrl, approvalPrompt, scopeStr)
 }
 
-// note that webhookRedirectURL and webhookVerifyToken can be empty strings if you aren't interested in webhooks
-func NewApp(clientId string, clientSecret, redirectURL string, authorizationCallbackDomain string, webhookServerURL string, webhookVerifyToken string, scopes []string) *App {
+// note that authorizationCallbackDomain, webhookServerURL, and webhookVerifyToken can be empty strings if you aren't interested in webhooks
+func NewApp(clientId string, clientSecret, redirectURL string, authorizationCallbackDomain string, webhookServerURL string, webhookVerifyToken string, webhookEventHandler func(StravaEvent), scopes []string) *App {
 	approvalUrl := generateApprovalUrl(clientId, redirectURL, scopes)
 	oauthCfg := &oauth2.Config{
 		ClientID:     clientId,
@@ -137,6 +139,7 @@ func NewApp(clientId string, clientSecret, redirectURL string, authorizationCall
 		WebhookServerURL:            webhookServerURL,
 		WebhookVerifyToken:          webhookVerifyToken,
 		WebhookReciever:             webhookReciever,
+		WebhookEventHandler: 		 webhookEventHandler,
 		Scopes:                      scopes,
 		SwaggerConfig:               cfg,
 		OAuthConfig:                 oauthCfg,
