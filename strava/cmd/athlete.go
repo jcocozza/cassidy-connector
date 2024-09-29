@@ -14,12 +14,12 @@ var getAthlete = &cobra.Command{
 	Short: "Get an authenticated athlete.",
 	Args: cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		stravaApp, err := createApp()
+		stravaApp, tkn, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-		athlete, err := stravaApp.Api.GetAthlete(context.TODO())
+		athlete, err := stravaApp.Api.GetAthlete(context.TODO(), tkn)
 		if err != nil {
 			fmt.Println(err.Error())
 			return

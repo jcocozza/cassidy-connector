@@ -14,7 +14,7 @@ var grantPermission = &cobra.Command{
 	Short: "Open a browser to allow for permission granting",
 	Args: cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		stravaApp, err := createApp()
+		stravaApp, _, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return

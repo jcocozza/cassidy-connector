@@ -76,7 +76,7 @@ type App struct {
 	// where you want the webserver to run for the webhooks e.g. http://localhost:8086
 	//
 	// Traffic from AuthorizationCallbackDomain should be routed to this server
-	WebhookServerURL   string
+	WebhookServerURL string
 	// Token to verify that data coming from the webhook is what you expect it to be
 	// Can just be a random string
 	WebhookVerifyToken string
@@ -89,13 +89,6 @@ type App struct {
 	SwaggerConfig *swagger.Configuration
 	// Contains the methods for interacting with the strava API
 	StravaClient *swagger.APIClient
-	// This contains the user's short-lived access token which is used to access data.
-	// When it expires, use the user's refresh token to get a new access token.
-	//
-	// This struct is obtained in 1 of 2 ways:
-	//   - by possessing an existing refresh token and getting a new access token (handled automatically by the oauth2 package).
-	//   - via user authorization, whereby an auth code is issued and is used to get the access token.
-	Token *oauth2.Token
 	// A way to get the authorization token from the intial authorization process
 	// Any calls to the stravaRedirectHandler will push the authorization code to the AuthorizationReciver channel.
 	AuthorizationReciever chan string
@@ -156,7 +149,7 @@ func NewApp(clientId string, clientSecret, redirectURL string, authorizationCall
 		WebhookServerURL:            webhookServerURL,
 		WebhookVerifyToken:          webhookVerifyToken,
 		WebhookReciever:             webhookReciever,
-		WebhookEventHandler: 		 webhookEventHandler,
+		WebhookEventHandler:         webhookEventHandler,
 		Scopes:                      scopes,
 		SwaggerConfig:               cfg,
 		OAuthConfig:                 oauthCfg,
@@ -172,54 +165,42 @@ func (a *App) ApprovalUrl() string {
 	return fmt.Sprintf(approvalUrlFormat, a.ClientId, responseType, a.RedirectURL, approvalPrompt, scopeStr)
 }
 
-// This is for the FIRST TIME getting the access token. It will set the token internally to the app.
+// This is for the FIRST TIME getting the access token.
 //
 // A user will grant permission to the app then will be redirected to the application's RedirectURL.
 // The RedirectURL will contain an authorization code. This code is used to get the user's access token.
+//
+// You are responsible for persisting user tokens
 func (a *App) GetAccessTokenFromAuthorizationCode(ctx context.Context, code string) (*oauth2.Token, error) {
 	token, err := a.OAuthConfig.Exchange(ctx, code)
 	if err != nil {
 		return nil, err
 	}
-	httpClient := a.OAuthConfig.Client(ctx, token)
-	a.Token = token
-	a.SwaggerConfig.HTTPClient = httpClient
 	return token, nil
 }
 
-// Turn a json string token into an `oauth2.Token` struct and load it into the app
-func (a *App) LoadTokenString(tokenJsonString string) error {
-	var token oauth2.Token
+// Turn a json string token into an `oauth2.Token` struct
+func (a *App) ReadTokenString(tokenJsonString string) (*oauth2.Token, error) {
+	var token *oauth2.Token
 	err := json.Unmarshal([]byte(tokenJsonString), &token)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	httpClient := a.OAuthConfig.Client(context.TODO(), &token)
-	a.Token = &token
-	a.SwaggerConfig.HTTPClient = httpClient
-	return nil
+	return token, nil
 }
 
-// Load an oauth2 token into the app
-func (a *App) LoadTokenDirect(token *oauth2.Token) {
-	httpClient := a.OAuthConfig.Client(context.TODO(), token)
-	a.Token = token
-	a.SwaggerConfig.HTTPClient = httpClient
-}
-
-// Load an oauth2 token into the app from a .json file
-func (a *App) LoadTokenFromFile(tokenFilePath string) error {
+// Load an oauth2 token from a .json file
+func (a *App) ReadTokenFromFile(tokenFilePath string) (*oauth2.Token, error) {
 	tokenData, err := os.ReadFile(tokenFilePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var token oauth2.Token
 	err = json.Unmarshal(tokenData, &token)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	a.LoadTokenDirect(&token)
-	return nil
+	return &token, nil
 }
 
 // Get the authorization code form the url that results from the redirect.
@@ -357,29 +338,14 @@ func (a *App) OpenStravaAppSettings() {
 	utils.OpenURL(stravaAppSettings)
 }
 
-// Create the OAuth2 token that is used for authentication in the app.
-//
-// The primary usecase for this is reading in a saved token from a database or file.
-// Once you've read in the token information, you can easily create a token with this method.
-// Then you can load the token into the app via the `LoadTokenDirect()` function.
-func (a *App) createToken(accessToken string, tokenType string, refreshToken string, expiry time.Time) *oauth2.Token {
-	return &oauth2.Token{
-		AccessToken:  accessToken,
-		TokenType:    tokenType,
-		RefreshToken: refreshToken,
-		Expiry:       expiry,
-	}
-}
-
 // this handler does a great deal of work
 //
-// When a get request is made, that is creating a subscription to the webhook:
-//
+// When a get request is make, (that is creating a subscription to the webhook):
 //	must respond within 2 seconds to the get request from strava
 //	per https://developers.strava.com/docs/webhooks/ it must repond with http status 200 and the hub.challenge
 //	once this happens the original webhook POST request will receive a response
 //
-// When a post request is made, we are asking the webhook for new events
+// When a post request is made strava is sending new events
 func (a *App) webhookRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:

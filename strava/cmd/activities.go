@@ -12,15 +12,16 @@ import (
 
 const layout string = "2006-01-02"
 const layoutInterpretation string = "YYYY-MM-DD"
+
 var perPage int
 var before string
 var after string
 var getActivities = &cobra.Command{
-	Use: "activities",
+	Use:   "activities",
 	Short: "Get activities.",
-	Args: cobra.ExactArgs(0),
+	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		stravaApp, err := createApp()
+		stravaApp, tkn, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -43,30 +44,26 @@ var getActivities = &cobra.Command{
 			}
 			afterTimePtr = &afterTime
 		}
-
-		activities, err := stravaApp.Api.GetActivities(context.TODO(), perPage, beforeTimePtr, afterTimePtr)
+		activities, err := stravaApp.Api.GetActivities(context.TODO(), tkn, perPage, beforeTimePtr, afterTimePtr)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-
 		activitiesJsonBytes, err := json.Marshal(activities)
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-
-
 		if outputPath != "" {
 			utils.WriteOutput(outputPath, activitiesJsonBytes)
 		}
 		fmt.Println(string(activitiesJsonBytes))
 	},
 }
+
 func init() {
 	getActivities.Flags().IntVarP(&perPage, "per-page", "n", 30, "The number of activities to get per page. (max 200)")
 	getActivities.Flags().StringVarP(&before, "before", "b", "", fmt.Sprintf("Filter to only include activities before this date. Must be of the format: %s", layoutInterpretation))
 	getActivities.Flags().StringVarP(&after, "after", "a", "", fmt.Sprintf("Filter to only include activities after this date. Must be of the format: %s", layoutInterpretation))
-
 	tokenCmdGroup.AddCommand(getActivities)
 }

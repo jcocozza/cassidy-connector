@@ -2,23 +2,34 @@ package cmd
 
 import (
 	"github.com/jcocozza/cassidy-connector/strava/app"
+	"golang.org/x/oauth2"
 )
 
 // Create the app based on the passed flag settings
-func createApp() (*app.App, error) {
-	stravaApp := app.NewApp(clientId, clientSecret, redirectURL, authorizationCallbackDomain, webhookServerURL, webhookVerifyToken, scopes)
+func createApp() (*app.App, *oauth2.Token, error) {
+	var tkn *oauth2.Token
+	var err error
+	stravaApp := app.NewApp(
+		clientId,
+		clientSecret,
+		redirectURL,
+		authorizationCallbackDomain,
+		webhookServerURL,
+		webhookVerifyToken,
+		nil,
+		scopes,
+	)
 	// when we have a token, we want to load it in to the app
 	if tokenPath != "" {
-		err := stravaApp.LoadTokenFromFile(tokenPath)
+		tkn, err = stravaApp.ReadTokenFromFile(tokenPath)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else if token != "" {
-		err := stravaApp.LoadTokenString(token)
+		tkn, err = stravaApp.ReadTokenString(token)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-
-	return stravaApp, nil
+	return stravaApp, tkn, nil
 }

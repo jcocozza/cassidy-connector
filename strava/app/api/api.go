@@ -7,6 +7,7 @@ import (
 
 	"github.com/antihax/optional"
 	"github.com/jcocozza/cassidy-connector/strava/swagger"
+	"golang.org/x/oauth2"
 )
 
 // StreamType represents the different types of steams that exist.
@@ -27,6 +28,28 @@ const (
 	GradeSmooth    StreamType = "grade_smooth"    // grade stream
 )
 
+// This contains the user's short-lived access token which is used to access data.
+// When it expires, use the user's refresh token to get a new access token.
+//
+// This struct is obtained in 1 of 2 ways:
+//   - by possessing an existing refresh token and getting a new access token (handled automatically by the oauth2 package).
+//   - via user authorization, whereby an auth code is issued and is used to get the access token.
+type userSession struct {
+	tkn *oauth2.Token
+}
+
+// this is needed to properly work with the swagger implementation
+//
+// when doing the OAuth, swagger will call this method to get the token
+func (us *userSession) Token() (*oauth2.Token, error) {
+	return us.tkn, nil
+}
+
+// return context for proper authorization when sending to the api
+func (us *userSession) AuthorizationContext(parent context.Context) context.Context {
+	return context.WithValue(parent, swagger.ContextOAuth2, us)
+}
+
 // The StravaAPI struct is the primary means of interacting with the strava api.
 //
 // This is the layer of abstraction so that users don't have to directly deal with api calls.
@@ -35,19 +58,24 @@ const (
 type StravaAPI struct {
 	stravaClient *swagger.APIClient
 }
+
 func NewStravaAPI(stravaClient *swagger.APIClient) *StravaAPI {
 	return &StravaAPI{
 		stravaClient: stravaClient,
 	}
 }
+
 // Get the athlete that is logged-in/authenticated
-func (api *StravaAPI) GetAthlete(ctx context.Context) (*swagger.DetailedAthlete, error) {
+func (api *StravaAPI) GetAthlete(ctx context.Context, token *oauth2.Token) (*swagger.DetailedAthlete, error) {
+	us := &userSession{tkn: token}
+	ctx = us.AuthorizationContext(ctx)
 	athlete, _, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &athlete, nil
 }
+
 // Get activities. Will cycle through all available pages of data.
 //
 // before and after are times to filter activies by. Both are optional (pass in nil to ignore them)
@@ -60,7 +88,9 @@ func (api *StravaAPI) GetAthlete(ctx context.Context) (*swagger.DetailedAthlete,
 //
 // If you plan on retreiving lots of data, you should set per page to be high. This will drastically reduce the number of API calls made.
 // (There is an API call made for each page)
-func (api *StravaAPI) GetActivities(ctx context.Context, perPage int, before, after *time.Time) ([][]swagger.SummaryActivity, error) {
+func (api *StravaAPI) GetActivities(ctx context.Context, token *oauth2.Token, perPage int, before, after *time.Time) ([][]swagger.SummaryActivity, error) {
+	us := &userSession{tkn: token}
+	ctx = us.AuthorizationContext(ctx)
 	var summaryActivitylol [][]swagger.SummaryActivity
 	opts := &swagger.ActivitiesApiGetLoggedInAthleteActivitiesOpts{}
 	if before != nil {
@@ -73,7 +103,6 @@ func (api *StravaAPI) GetActivities(ctx context.Context, perPage int, before, af
 	}
 	perPageOpt := optional.NewInt32(int32(perPage))
 	opts.PerPage = perPageOpt
-
 	existsMore := true
 	var page int32 = 1 // page enumeration starts at 1
 	for existsMore {   // enumerate until there are no more activities
@@ -85,19 +114,21 @@ func (api *StravaAPI) GetActivities(ctx context.Context, perPage int, before, af
 		//return summary, nil
 		summaryActivitylol = append(summaryActivitylol, summary)
 		page += 1
-
 		if len(summary) == 0 {
 			existsMore = false
 		}
 	}
 	return summaryActivitylol, nil
 }
+
 // Get a single activity by activity ID
 //
 // `activityID` is the id of the activity
 //
 // `includeAllEfforts` includes all segment efforts if true
-func (api *StravaAPI) GetActivity(ctx context.Context, activityID int, includeAllEfforts bool) (*swagger.DetailedActivity, error) {
+func (api *StravaAPI) GetActivity(ctx context.Context, token *oauth2.Token, activityID int, includeAllEfforts bool) (*swagger.DetailedActivity, error) {
+	us := &userSession{tkn: token}
+	ctx = us.AuthorizationContext(ctx)
 	opts := &swagger.ActivitiesApiGetActivityByIdOpts{IncludeAllEfforts: optional.NewBool(includeAllEfforts)}
 	activity, _, err := api.stravaClient.ActivitiesApi.GetActivityById(ctx, int64(activityID), opts)
 	if err != nil {
@@ -105,6 +136,7 @@ func (api *StravaAPI) GetActivity(ctx context.Context, activityID int, includeAl
 	}
 	return &activity, nil
 }
+
 // convert a list of StreamType into a list of string
 //
 // this is just a simple way to ensure that users aren't passing weird stream types into the `GetActivityStreams` function
@@ -117,7 +149,6 @@ func convertKeys(keys []StreamType) []string {
 }
 func validateKeys(keys []StreamType) error {
 	keyList := []StreamType{Time, Distance, Latlng, Altitude, VelocitySmooth, Heartrate, Cadence, Watts, Temp, Moving, GradeSmooth}
-
 	for _, key := range keys {
 		isInvalid := true
 		for _, actKey := range keyList {
@@ -132,6 +163,7 @@ func validateKeys(keys []StreamType) error {
 	}
 	return nil
 }
+
 // Get the streams for a given activity.
 //
 // `activityID` is the id of the activity
@@ -143,7 +175,9 @@ func validateKeys(keys []StreamType) error {
 // Each of these are exported by the package as constant symbols for proper access as StreamType types.
 //
 // This will return a struct containing the desired streams for the activity
-func (api *StravaAPI) GetActivityStreams(ctx context.Context, activityID int, keys []StreamType) (*swagger.StreamSet, error) {
+func (api *StravaAPI) GetActivityStreams(ctx context.Context, token *oauth2.Token, activityID int, keys []StreamType) (*swagger.StreamSet, error) {
+	us := &userSession{tkn: token}
+	ctx = us.AuthorizationContext(ctx)
 	keyByType := true
 	err := validateKeys(keys)
 	if err != nil {

@@ -21,7 +21,7 @@ var createSubscription = &cobra.Command{
 	Short: "create a subscription for your app. this is a one-time run. note that this will spawn a server at the callback url that recieves events",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		stravaApp, err := createApp()
+		stravaApp, _, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -46,7 +46,7 @@ var launchWebhookServer = &cobra.Command{
 	Short: "launch the server. only do this if you have already created a webhook subscription.",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		stravaApp, err := createApp()
+		stravaApp, _, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -70,7 +70,7 @@ var viewSubscription = &cobra.Command{
 	Short: "view subscription for your app",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		stravaApp, err := createApp()
+		stravaApp, _, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -89,7 +89,7 @@ var deleteSubscription = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		subscriptionID := args[0]
-		stravaApp, err := createApp()
+		stravaApp, _, err := createApp()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
