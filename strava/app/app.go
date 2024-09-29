@@ -138,12 +138,11 @@ func NewApp(clientId string, clientSecret, redirectURL string, authorizationCall
 		WebhookVerifyToken:          webhookVerifyToken,
 		WebhookReciever:             webhookReciever,
 		Scopes:                      scopes,
-
-		SwaggerConfig:         cfg,
-		OAuthConfig:           oauthCfg,
-		StravaClient:          client,
-		Api:                   api.NewStravaAPI(client),
-		AuthorizationReciever: reciever,
+		SwaggerConfig:               cfg,
+		OAuthConfig:                 oauthCfg,
+		StravaClient:                client,
+		Api:                         api.NewStravaAPI(client),
+		AuthorizationReciever:       reciever,
 	}
 }
 
@@ -419,28 +418,13 @@ func (a *App) webhookRedirectHandler(w http.ResponseWriter, r *http.Request) {
 //
 // note that the AuthorizationCallbackDomain MUST be open to the internet otherwise strava cannot send information to the server
 func (a *App) CreateSubscription() (int, *http.Server, *sync.WaitGroup, error) {
+	srv, wg, err := a.LaunchWebhookServer()
+	if err != nil {
+		wg.Done()
+		return -1, nil, nil, err
+	}
 	// the subscription process will return a challence to the callback url
 	// as such we need to be listening for that before we make the request
-	_, path, err := parseURL(a.AuthorizationCallbackDomain)
-	if err != nil {
-		return -1, nil, nil, err
-	}
-	hostWithPort, _, err := parseURL(a.WebhookServerURL)
-	if err != nil {
-		return -1, nil, nil, err
-	}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/"+path, a.webhookRedirectHandler)
-	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("alive")) })
-	srv := &http.Server{Addr: hostWithPort, Handler: mux}
-	wg := &sync.WaitGroup{}
-	go func() {
-		wg.Add(1)
-		if err := srv.ListenAndServe(); err != nil {
-			// unexpected error. port in use?
-			fmt.Printf("ListenAndServe(): %v\n", err)
-		}
-	}()
 	// make sure that the server is running
 	time.Sleep(1 * time.Second)
 	payload := map[string]string{
@@ -486,6 +470,37 @@ func (a *App) CreateSubscription() (int, *http.Server, *sync.WaitGroup, error) {
 		return -1, nil, nil, err
 	}
 	return sr.Id, srv, wg, nil
+}
+
+// spawns a server with 2 routes:
+//  1. the path specified by the AuthorizationCallbackDomain which will process events
+//  2. /status which will return "alive" if the server is alive
+//
+// returns:
+//   - the created server
+//   - a wait group. by calling wg.Wait() you keep the server running until it is explicitly stopped.
+func (a *App) LaunchWebhookServer() (*http.Server, *sync.WaitGroup, error) {
+	_, path, err := parseURL(a.AuthorizationCallbackDomain)
+	if err != nil {
+		return nil, nil, err
+	}
+	hostWithPort, _, err := parseURL(a.WebhookServerURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/"+path, a.webhookRedirectHandler)
+	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("alive")) })
+	srv := &http.Server{Addr: hostWithPort, Handler: mux}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			// unexpected error. port in use?
+			fmt.Printf("ListenAndServe(): %v\n", err)
+		}
+	}()
+	return srv, wg, nil
 }
 
 // view the subscription associated with your client id/client secret
