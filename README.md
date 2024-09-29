@@ -8,6 +8,8 @@ This will start with a basic strava integration and (hopefully) grow overtime to
 
 The ultimate goal is to allow users to entirely disconnect their data from external servers if they so desire.
 
+As a warning, everything should be considered unstable until v1.0.0 is released.
+
 ## Strava
 
 The first step in the project is to get some basic data connections to allow users to import their data.
