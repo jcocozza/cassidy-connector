@@ -371,13 +371,13 @@ func (a *App) webhookRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("error reading post content: %s", err.Error()), http.StatusInternalServerError)
 			return
 		}
 		se := StravaEvent{}
 		err = json.Unmarshal(body, &se)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("error unmarshalling event: %s", err.Error()), http.StatusInternalServerError)
 			return
 		}
 		if a.WebhookEventHandler != nil {
@@ -391,6 +391,7 @@ func (a *App) webhookRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 }
