@@ -66,19 +66,45 @@ func (us *userSession) AuthorizationContext(parent context.Context) context.Cont
 type StravaAPI struct {
 	stravaClient *swagger.APIClient
 	logger *slog.Logger
+	oauth *oauth2.Config
 }
 
-func NewStravaAPI(stravaClient *swagger.APIClient, logger *slog.Logger) *StravaAPI {
+func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *slog.Logger) *StravaAPI {
 	return &StravaAPI{
 		stravaClient: stravaClient,
 		logger: logger,
+		oauth: cfg,
 	}
+}
+
+// auto refresh the token via TokenSource
+func (api *StravaAPI) refreshToken(ctx context.Context, token *oauth2.Token) (*oauth2.Token, error) {
+	src := api.oauth.TokenSource(ctx, token)
+	newToken, err := src.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
+	}
+	return newToken, nil
+}
+
+// set auth context with a refreshed token
+func (api *StravaAPI) setContext(ctx context.Context, token *oauth2.Token) (context.Context, error) {
+	refreshedTkn, err := api.refreshToken(ctx, token)
+	if err != nil {
+		api.logger.ErrorContext(ctx, "token refresh failed")
+		return nil, err
+	}
+	us := &userSession{tkn: refreshedTkn}
+	newCtx := us.AuthorizationContext(ctx)
+	return newCtx, nil
 }
 
 // Get the athlete that is logged-in/authenticated
 func (api *StravaAPI) GetAthlete(ctx context.Context, token *oauth2.Token) (*swagger.DetailedAthlete, error) {
-	us := &userSession{tkn: token}
-	ctx = us.AuthorizationContext(ctx)
+	ctx, err := api.setContext(ctx, token)
+	if err != nil {
+		return nil, err
+	}
 	api.logger.DebugContext(ctx, "getting athlete")
 	athlete, resp, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
 	if resp.StatusCode == http.StatusNotFound {
@@ -105,8 +131,10 @@ func (api *StravaAPI) GetAthlete(ctx context.Context, token *oauth2.Token) (*swa
 // If you plan on retreiving lots of data, you should set per page to be high. This will drastically reduce the number of API calls made.
 // (There is an API call made for each page)
 func (api *StravaAPI) GetActivities(ctx context.Context, token *oauth2.Token, perPage int, before, after *time.Time) ([][]swagger.SummaryActivity, error) {
-	us := &userSession{tkn: token}
-	ctx = us.AuthorizationContext(ctx)
+	ctx, err := api.setContext(ctx, token)
+	if err != nil {
+		return nil, err
+	}
 	api.logger.DebugContext(ctx, "getting activities",
 		slog.Int("per page", perPage),
 		slog.Any("before", before),
@@ -149,8 +177,10 @@ func (api *StravaAPI) GetActivities(ctx context.Context, token *oauth2.Token, pe
 //
 // `includeAllEfforts` includes all segment efforts if true
 func (api *StravaAPI) GetActivity(ctx context.Context, token *oauth2.Token, activityID int, includeAllEfforts bool) (*swagger.DetailedActivity, error) {
-	us := &userSession{tkn: token}
-	ctx = us.AuthorizationContext(ctx)
+	ctx, err := api.setContext(ctx, token)
+	if err != nil {
+		return nil, err
+	}
 	api.logger.DebugContext(ctx, "getting activity", slog.Int("activity id", activityID), slog.Bool("include all efforts", includeAllEfforts))
 	opts := &swagger.ActivitiesApiGetActivityByIdOpts{IncludeAllEfforts: optional.NewBool(includeAllEfforts)}
 	activity, resp, err := api.stravaClient.ActivitiesApi.GetActivityById(ctx, int64(activityID), opts)
@@ -204,11 +234,13 @@ func validateKeys(keys []StreamType) error {
 //
 // This will return a struct containing the desired streams for the activity
 func (api *StravaAPI) GetActivityStreams(ctx context.Context, token *oauth2.Token, activityID int, keys []StreamType) (*swagger.StreamSet, error) {
-	us := &userSession{tkn: token}
-	ctx = us.AuthorizationContext(ctx)
+	ctx, err := api.setContext(ctx, token)
+	if err != nil {
+		return nil, err
+	}
 	api.logger.DebugContext(ctx, "getting activity streams", slog.Int("activity id", activityID), slog.Any("keys", keys))
 	keyByType := true
-	err := validateKeys(keys)
+	err = validateKeys(keys)
 	if err != nil {
 		api.logger.ErrorContext(ctx, "invalid keys", slog.String("error", err.Error()))
 		return nil, err

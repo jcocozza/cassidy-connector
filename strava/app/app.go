@@ -162,7 +162,7 @@ func NewApp(clientId string, clientSecret, redirectURL string, authorizationCall
 		SwaggerConfig:               cfg,
 		OAuthConfig:                 oauthCfg,
 		StravaClient:                client,
-		Api:                         api.NewStravaAPI(client, logger.WithGroup("api")),
+		Api:                         api.NewStravaAPI(client, oauthCfg, logger.WithGroup("api")),
 		AuthorizationReciever:       reciever,
 	}
 }
