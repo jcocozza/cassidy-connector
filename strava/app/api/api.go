@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -64,11 +65,13 @@ func (us *userSession) AuthorizationContext(parent context.Context) context.Cont
 // Whenever possible, this will throw the NotFoundError when the underlying strava api returns a 404
 type StravaAPI struct {
 	stravaClient *swagger.APIClient
+	logger *slog.Logger
 }
 
-func NewStravaAPI(stravaClient *swagger.APIClient) *StravaAPI {
+func NewStravaAPI(stravaClient *swagger.APIClient, logger *slog.Logger) *StravaAPI {
 	return &StravaAPI{
 		stravaClient: stravaClient,
+		logger: logger,
 	}
 }
 
@@ -76,11 +79,14 @@ func NewStravaAPI(stravaClient *swagger.APIClient) *StravaAPI {
 func (api *StravaAPI) GetAthlete(ctx context.Context, token *oauth2.Token) (*swagger.DetailedAthlete, error) {
 	us := &userSession{tkn: token}
 	ctx = us.AuthorizationContext(ctx)
+	api.logger.DebugContext(ctx, "getting athlete")
 	athlete, resp, err := api.stravaClient.AthletesApi.GetLoggedInAthlete(ctx)
 	if resp.StatusCode == http.StatusNotFound {
+		api.logger.DebugContext(ctx, "athlete not found")
 		return nil, NotFoundError
 	}
 	if err != nil {
+		api.logger.ErrorContext(ctx, "error getting athlete", slog.String("error", err.Error()))
 		return nil, err
 	}
 	return &athlete, nil
@@ -101,6 +107,11 @@ func (api *StravaAPI) GetAthlete(ctx context.Context, token *oauth2.Token) (*swa
 func (api *StravaAPI) GetActivities(ctx context.Context, token *oauth2.Token, perPage int, before, after *time.Time) ([][]swagger.SummaryActivity, error) {
 	us := &userSession{tkn: token}
 	ctx = us.AuthorizationContext(ctx)
+	api.logger.DebugContext(ctx, "getting activities",
+		slog.Int("per page", perPage),
+		slog.Any("before", before),
+		slog.Any("after", after),
+	)
 	var summaryActivitylol [][]swagger.SummaryActivity
 	opts := &swagger.ActivitiesApiGetLoggedInAthleteActivitiesOpts{}
 	if before != nil {
@@ -119,6 +130,7 @@ func (api *StravaAPI) GetActivities(ctx context.Context, token *oauth2.Token, pe
 		opts.Page = optional.NewInt32(page)
 		summary, _, err := api.stravaClient.ActivitiesApi.GetLoggedInAthleteActivities(ctx, opts)
 		if err != nil {
+			api.logger.ErrorContext(ctx, "getting activities failed", slog.Any("page", opts.Page), slog.String("error", err.Error()))
 			return nil, err
 		}
 		//return summary, nil
@@ -139,12 +151,15 @@ func (api *StravaAPI) GetActivities(ctx context.Context, token *oauth2.Token, pe
 func (api *StravaAPI) GetActivity(ctx context.Context, token *oauth2.Token, activityID int, includeAllEfforts bool) (*swagger.DetailedActivity, error) {
 	us := &userSession{tkn: token}
 	ctx = us.AuthorizationContext(ctx)
+	api.logger.DebugContext(ctx, "getting activity", slog.Int("activity id", activityID), slog.Bool("include all efforts", includeAllEfforts))
 	opts := &swagger.ActivitiesApiGetActivityByIdOpts{IncludeAllEfforts: optional.NewBool(includeAllEfforts)}
 	activity, resp, err := api.stravaClient.ActivitiesApi.GetActivityById(ctx, int64(activityID), opts)
 	if resp.StatusCode == http.StatusNotFound {
+		api.logger.DebugContext(ctx, "activity not found")
 		return nil, NotFoundError
 	}
 	if err != nil {
+		api.logger.ErrorContext(ctx, "error getting activity", slog.String("error", err.Error()))
 		return nil, err
 	}
 	return &activity, nil
@@ -191,17 +206,21 @@ func validateKeys(keys []StreamType) error {
 func (api *StravaAPI) GetActivityStreams(ctx context.Context, token *oauth2.Token, activityID int, keys []StreamType) (*swagger.StreamSet, error) {
 	us := &userSession{tkn: token}
 	ctx = us.AuthorizationContext(ctx)
+	api.logger.DebugContext(ctx, "getting activity streams", slog.Int("activity id", activityID), slog.Any("keys", keys))
 	keyByType := true
 	err := validateKeys(keys)
 	if err != nil {
+		api.logger.ErrorContext(ctx, "invalid keys", slog.String("error", err.Error()))
 		return nil, err
 	}
 	keyList := convertKeys(keys)
 	streamSet, resp, err := api.stravaClient.StreamsApi.GetActivityStreams(ctx, int64(activityID), keyList, keyByType)
 	if resp.StatusCode == http.StatusNotFound {
+		api.logger.DebugContext(ctx, "streams not found")
 		return nil, NotFoundError
 	}
 	if err != nil {
+		api.logger.ErrorContext(ctx, "error getting streams", slog.String("error", err.Error()))
 		return nil, err
 	}
 	return &streamSet, nil

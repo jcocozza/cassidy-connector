@@ -18,6 +18,7 @@ func createApp() (*app.App, *oauth2.Token, error) {
 		webhookVerifyToken,
 		nil,
 		scopes,
+		nil,// no logger for the cli
 	)
 	// when we have a token, we want to load it in to the app
 	if tokenPath != "" {
