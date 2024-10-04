@@ -16,6 +16,8 @@ import (
 
 // if the strava api returns 404 not found, will throw this error
 var NotFoundError = errors.New("Object not found")
+// if the rate limiter throws an error
+var RateLimitError = errors.New("Rate Limit Error. (this likely means context expired while waiting for rate limits to be reset)")
 
 // StreamType represents the different types of steams that exist.
 // These are exported from the package.
@@ -98,11 +100,13 @@ func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *s
 func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
 	err := api.limiterDaily.Wait(ctx)
 	if err != nil {
-		return fmt.Errorf("failed daily rate limits: %w", err)
+		//return fmt.Errorf("failed daily rate limits: %w", err)
+		return RateLimitError
 	}
 	err = api.limiter15min.Wait(ctx)
 	if err != nil {
-		return fmt.Errorf("failed 15 minutes rate limits: %w", err)
+		//return fmt.Errorf("failed 15 minutes rate limits: %w", err)
+		return RateLimitError
 	}
 	return nil
 }
