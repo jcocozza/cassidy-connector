@@ -20,6 +20,10 @@ I will be given credentials (e.g. client secret). These are used to instantiate 
 
 In each app package is an `api` folder. This will contain a stuct with the name convention `<Platform>API` (e.g. `StravaAPI`).
 
+The idea is that the App and `<Platform>API` structs are _long lived_.
+You instantiate them when your app spins up and then use the same `<Platform>API` struct instance to make all of your calls.
+(Or, if you have several, you can distribute the load across several)
+
 ### API struct
 This api struct is the main point of access for users that want to programatically use the platform's api.
 I like to think of this api struct as a convience wrapper. It hides the details of things like a swagger implementation, or even just raw http requests.

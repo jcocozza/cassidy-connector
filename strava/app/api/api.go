@@ -16,6 +16,7 @@ import (
 
 // if the strava api returns 404 not found, will throw this error
 var NotFoundError = errors.New("Object not found")
+
 // if the rate limiter throws an error
 var RateLimitError = errors.New("Rate Limit Error. (this likely means context expired while waiting for rate limits to be reset)")
 
@@ -75,7 +76,7 @@ func (us *userSession) AuthorizationContext(parent context.Context) context.Cont
 //
 // It will handle methods related to data in the strava api.
 //
-// Whenever possible, this will return the NotFoundError when the underlying strava api returns a 404
+// # Whenever possible, this will return the NotFoundError when the underlying strava api returns a 404
 //
 // All the methods here are also rate limited per the strava guidelines
 // Make sure that every context has a timeout, otherwise the program will block until the rate limits refreshes.
@@ -97,6 +98,9 @@ func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *s
 	}
 }
 
+// check to see if the limits have been surpassed
+//
+// ** should be called before every api call **
 func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
 	err := api.limiterDaily.Wait(ctx)
 	if err != nil {
@@ -109,6 +113,14 @@ func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
 		return RateLimitError
 	}
 	return nil
+}
+
+// return the remaining requests for the 15 mintue request window and the daily window
+// (in that order)
+func (api *StravaAPI) RemainingRequests() (int, int) {
+	rr15 := int(float64(api.limiter15min.Burst()) - api.limiter15min.Tokens())
+	rrdaily := int(float64(api.limiterDaily.Burst()) - api.limiterDaily.Tokens())
+	return rr15, rrdaily
 }
 
 // auto refresh the token via TokenSource
