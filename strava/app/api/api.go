@@ -11,6 +11,7 @@ import (
 	"github.com/antihax/optional"
 	"github.com/jcocozza/cassidy-connector/strava/swagger"
 	"golang.org/x/oauth2"
+	"golang.org/x/time/rate"
 )
 
 // if the strava api returns 404 not found, will throw this error
@@ -32,6 +33,16 @@ const (
 	Temp           StreamType = "temp"            // temp stream
 	Moving         StreamType = "moving"          // moving stream
 	GradeSmooth    StreamType = "grade_smooth"    // grade stream
+)
+
+const (
+	// The strava API limits to 300 READ requests per 15 minutes (e.g. 0.33 requests per second)
+	readRateLimit15Min = 300.0
+	// The strava API limits to 3000 READ requests per day (e.g. 0.034 requests per second)
+	readRateLimiteDaily = 3000.0
+
+	rps15min = readRateLimit15Min / (15 * 60)
+	rpsDaily = readRateLimiteDaily / (24 * 60 * 60)
 )
 
 // This contains the user's short-lived access token which is used to access data.
@@ -60,21 +71,40 @@ func (us *userSession) AuthorizationContext(parent context.Context) context.Cont
 //
 // This is the layer of abstraction so that users don't have to directly deal with api calls.
 //
-// It will handle methods related to data in the strava api. (auth will be handled by the broader app struct)
+// It will handle methods related to data in the strava api.
 //
-// Whenever possible, this will throw the NotFoundError when the underlying strava api returns a 404
+// Whenever possible, this will return the NotFoundError when the underlying strava api returns a 404
+//
+// All the methods here are also rate limited per the strava guidelines
+// Make sure that every context has a timeout, otherwise the program will block until the rate limits refreshes.
 type StravaAPI struct {
 	stravaClient *swagger.APIClient
-	logger *slog.Logger
-	oauth *oauth2.Config
+	logger       *slog.Logger
+	oauth        *oauth2.Config
+	limiter15min *rate.Limiter
+	limiterDaily *rate.Limiter
 }
 
 func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *slog.Logger) *StravaAPI {
 	return &StravaAPI{
 		stravaClient: stravaClient,
-		logger: logger,
-		oauth: cfg,
+		logger:       logger,
+		oauth:        cfg,
+		limiter15min: rate.NewLimiter(rate.Limit(rps15min), 300),
+		limiterDaily: rate.NewLimiter(rate.Limit(rpsDaily), 3000),
 	}
+}
+
+func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
+	err := api.limiterDaily.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("failed daily rate limits: %w", err)
+	}
+	err = api.limiter15min.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("failed 15 minutes rate limits: %w", err)
+	}
+	return nil
 }
 
 // auto refresh the token via TokenSource
@@ -101,7 +131,11 @@ func (api *StravaAPI) setContext(ctx context.Context, token *oauth2.Token) (cont
 
 // Get the athlete that is logged-in/authenticated
 func (api *StravaAPI) GetAthlete(ctx context.Context, token *oauth2.Token) (*swagger.DetailedAthlete, error) {
-	ctx, err := api.setContext(ctx, token)
+	err := api.checkRateLimits(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err = api.setContext(ctx, token)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +190,10 @@ func (api *StravaAPI) GetActivities(ctx context.Context, token *oauth2.Token, pe
 	var page int32 = 1 // page enumeration starts at 1
 	for existsMore {   // enumerate until there are no more activities
 		opts.Page = optional.NewInt32(page)
+		err := api.checkRateLimits(ctx)
+		if err != nil {
+			return nil, err
+		}
 		summary, _, err := api.stravaClient.ActivitiesApi.GetLoggedInAthleteActivities(ctx, opts)
 		if err != nil {
 			api.logger.ErrorContext(ctx, "getting activities failed", slog.Any("page", opts.Page), slog.String("error", err.Error()))
@@ -177,7 +215,11 @@ func (api *StravaAPI) GetActivities(ctx context.Context, token *oauth2.Token, pe
 //
 // `includeAllEfforts` includes all segment efforts if true
 func (api *StravaAPI) GetActivity(ctx context.Context, token *oauth2.Token, activityID int, includeAllEfforts bool) (*swagger.DetailedActivity, error) {
-	ctx, err := api.setContext(ctx, token)
+	err := api.checkRateLimits(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err = api.setContext(ctx, token)
 	if err != nil {
 		return nil, err
 	}
@@ -246,6 +288,10 @@ func (api *StravaAPI) GetActivityStreams(ctx context.Context, token *oauth2.Toke
 		return nil, err
 	}
 	keyList := convertKeys(keys)
+	err = api.checkRateLimits(ctx)
+	if err != nil {
+		return nil, err
+	}
 	streamSet, resp, err := api.stravaClient.StreamsApi.GetActivityStreams(ctx, int64(activityID), keyList, keyByType)
 	if resp.StatusCode == http.StatusNotFound {
 		api.logger.DebugContext(ctx, "streams not found")

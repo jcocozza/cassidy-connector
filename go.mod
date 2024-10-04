@@ -4,6 +4,8 @@ go 1.22.0
 
 require github.com/spf13/cobra v1.8.0
 
+require golang.org/x/time v0.7.0 // indirect
+
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
