@@ -40,9 +40,11 @@ const (
 
 const (
 	// The strava API limits to 300 READ requests per 15 minutes
-	ReadRateLimit15Min = 300
+	ReadLimit15Min = 300.0
+	read15MinTokenPerSecond = ReadLimit15Min / 15 / 60
 	// The strava API limits to 3000 READ requests per day
-	ReadRateLimiteDaily = 3000
+	ReadLimitDaily = 3000.0
+	readDailyTokenPerSecond = ReadLimitDaily / 24 / 60 / 60
 )
 
 // This contains the user's short-lived access token which is used to access data.
@@ -90,8 +92,8 @@ func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *s
 		stravaClient: stravaClient,
 		logger:       logger,
 		oauth:        cfg,
-		limiter15min: rate.NewLimiter(rate.Every(15*time.Minute), ReadRateLimit15Min),
-		limiterDaily: rate.NewLimiter(rate.Every(24*time.Hour), ReadRateLimiteDaily),
+		limiter15min: rate.NewLimiter(read15MinTokenPerSecond, ReadLimit15Min),
+		limiterDaily: rate.NewLimiter(readDailyTokenPerSecond, ReadLimitDaily),
 	}
 }
 
