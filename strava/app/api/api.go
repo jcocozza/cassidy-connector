@@ -10,8 +10,8 @@ import (
 
 	"github.com/antihax/optional"
 	"github.com/jcocozza/cassidy-connector/strava/swagger"
+	"github.com/jcocozza/ratelimit"
 	"golang.org/x/oauth2"
-	"golang.org/x/time/rate"
 )
 
 // if the strava api returns 404 not found, will throw this error
@@ -40,11 +40,11 @@ const (
 
 const (
 	// The strava API limits to 300 READ requests per 15 minutes
-	ReadLimit15Min = 300.0
-	read15MinTokenPerSecond = ReadLimit15Min / 15 / 60
+	ReadLimit15Min          = 300.0
+	ReadLimit15MinDuration  = time.Duration(15*time.Minute)
 	// The strava API limits to 3000 READ requests per day
-	ReadLimitDaily = 3000.0
-	readDailyTokenPerSecond = ReadLimitDaily / 24 / 60 / 60
+	ReadLimitDaily          = 3000.0
+	ReadLimitDailyDuration  = time.Duration(24*time.Hour)
 )
 
 // This contains the user's short-lived access token which is used to access data.
@@ -83,8 +83,8 @@ type StravaAPI struct {
 	stravaClient *swagger.APIClient
 	logger       *slog.Logger
 	oauth        *oauth2.Config
-	limiter15min *rate.Limiter
-	limiterDaily *rate.Limiter
+	limiter15min *ratelimit.FixedWindow
+	limiterDaily *ratelimit.FixedWindow
 }
 
 func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *slog.Logger) *StravaAPI {
@@ -92,21 +92,23 @@ func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *s
 		stravaClient: stravaClient,
 		logger:       logger,
 		oauth:        cfg,
-		limiter15min: rate.NewLimiter(read15MinTokenPerSecond, ReadLimit15Min),
-		limiterDaily: rate.NewLimiter(readDailyTokenPerSecond, ReadLimitDaily),
+		limiter15min: ratelimit.NewFixedWindow(ReadLimit15MinDuration, ReadLimit15Min),
+		limiterDaily: ratelimit.NewFixedWindow(ReadLimitDailyDuration, ReadLimitDaily),
 	}
 }
 
 // check to see if the limits have been surpassed
 //
+// if you have exceeded the rate limit, will sleep until the next time interval
+//
 // ** should be called before every api call **
 func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
-	err := api.limiterDaily.Wait(ctx)
+	err := api.limiterDaily.WaitRequest(ctx)
 	if err != nil {
 		api.logger.ErrorContext(ctx, "failed daily rate limits", slog.String("error", err.Error()))
 		return RateLimitError
 	}
-	err = api.limiter15min.Wait(ctx)
+	err = api.limiter15min.WaitRequest(ctx)
 	if err != nil {
 		api.logger.ErrorContext(ctx, "failed 15 minute rate limits", slog.String("error", err.Error()))
 		return RateLimitError
@@ -117,8 +119,11 @@ func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
 // return the remaining requests for the 15 mintue request window and the daily window
 // (in that order)
 func (api *StravaAPI) RemainingRequests() (int, int) {
-	rr15 := int(api.limiter15min.Tokens())
-	rrdaily := int(api.limiterDaily.Tokens())
+	rrdaily := api.limiterDaily.RequestsRemaining()
+	if rrdaily == 0 {
+		return 0, 0
+	}
+	rr15 := api.limiter15min.RequestsRemaining()
 	return rr15, rrdaily
 }
 

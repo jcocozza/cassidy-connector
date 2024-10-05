@@ -1,10 +1,11 @@
 module github.com/jcocozza/cassidy-connector
 
-go 1.22.0
+go 1.23.2
 
-require github.com/spf13/cobra v1.8.0
-
-require golang.org/x/time v0.7.0 // indirect
+require (
+	github.com/jcocozza/ratelimit v0.0.0-20241005210358-75ab6d197467
+	github.com/spf13/cobra v1.8.0
+)
 
 require (
 	github.com/antihax/optional v1.0.0
