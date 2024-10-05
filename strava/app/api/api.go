@@ -127,6 +127,12 @@ func (api *StravaAPI) RemainingRequests() (int, int) {
 	return rr15, rrdaily
 }
 
+// return the time till the next 15 minute window and the next daily window
+// (in that order)
+func (api *StravaAPI) TimeTillNextWindows() (time.Duration, time.Duration){
+	return api.limiter15min.TimeTillNextWindow(), api.limiterDaily.TimeTillNextWindow()
+}
+
 // auto refresh the token via TokenSource
 func (api *StravaAPI) refreshToken(ctx context.Context, token *oauth2.Token) (*oauth2.Token, error) {
 	src := api.oauth.TokenSource(ctx, token)
