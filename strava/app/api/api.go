@@ -93,8 +93,8 @@ func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *s
 		stravaClient: stravaClient,
 		logger:       logger,
 		oauth:        cfg,
-		limiter15min: rate.NewLimiter(rate.Limit(rps15min), 300),
-		limiterDaily: rate.NewLimiter(rate.Limit(rpsDaily), 3000),
+		limiter15min: rate.NewLimiter(rate.Limit(rps15min), readRateLimit15Min),
+		limiterDaily: rate.NewLimiter(rate.Limit(rpsDaily), readRateLimiteDaily),
 	}
 }
 
@@ -104,12 +104,12 @@ func NewStravaAPI(stravaClient *swagger.APIClient, cfg *oauth2.Config, logger *s
 func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
 	err := api.limiterDaily.Wait(ctx)
 	if err != nil {
-		//return fmt.Errorf("failed daily rate limits: %w", err)
+		api.logger.ErrorContext(ctx, "failed daily rate limits", slog.String("error", err.Error()))
 		return RateLimitError
 	}
 	err = api.limiter15min.Wait(ctx)
 	if err != nil {
-		//return fmt.Errorf("failed 15 minutes rate limits: %w", err)
+		api.logger.ErrorContext(ctx, "failed 15 minute rate limits", slog.String("error", err.Error()))
 		return RateLimitError
 	}
 	return nil
