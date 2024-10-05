@@ -115,8 +115,8 @@ func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
 // return the remaining requests for the 15 mintue request window and the daily window
 // (in that order)
 func (api *StravaAPI) RemainingRequests() (int, int) {
-	rr15 := int(float64(api.limiter15min.Burst()) - api.limiter15min.Tokens())
-	rrdaily := int(float64(api.limiterDaily.Burst()) - api.limiterDaily.Tokens())
+	rr15 := int(api.limiter15min.Tokens())
+	rrdaily := int(api.limiterDaily.Tokens())
 	return rr15, rrdaily
 }
 
