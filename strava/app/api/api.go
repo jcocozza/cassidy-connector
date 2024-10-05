@@ -112,15 +112,12 @@ func (api *StravaAPI) checkRateLimits(ctx context.Context) error {
 	return nil
 }
 
-// return the remaining requests for the 15 mintue request window, the daily window,
-// the remaining time in the 15 minute window and the remaining time in the daily window
+// return the remaining requests for the 15 mintue request window and the daily window
 // (in that order)
-func (api *StravaAPI) RemainingRequests() (int, int, time.Duration, time.Duration) {
+func (api *StravaAPI) RemainingRequests() (int, int) {
 	rr15 := int(float64(api.limiter15min.Burst()) - api.limiter15min.Tokens())
 	rrdaily := int(float64(api.limiterDaily.Burst()) - api.limiterDaily.Tokens())
-	rt15 := api.limiter15min.Reserve().Delay()
-	rtdaily := api.limiterDaily.Reserve().Delay()
-	return rr15, rrdaily, rt15, rtdaily
+	return rr15, rrdaily
 }
 
 // auto refresh the token via TokenSource
