@@ -3,7 +3,7 @@ module github.com/jcocozza/cassidy-connector
 go 1.23.2
 
 require (
-	github.com/jcocozza/ratelimit v0.0.0-20241005232646-5bee4064b139
+	github.com/jcocozza/ratelimit v0.0.0-20241007201339-f86eef901041
 	github.com/spf13/cobra v1.8.0
 )
 
