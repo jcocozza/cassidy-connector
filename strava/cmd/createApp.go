@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"log/slog"
+	"os"
 
 	"github.com/jcocozza/cassidy-connector/strava/app"
 	"golang.org/x/oauth2"
@@ -22,7 +23,7 @@ func createApp() (*app.App, *oauth2.Token, error) {
 		nil,
 		scopes,
 		//nil,// no logger for the cli
-		slog.Default(),
+		slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	)
 	// when we have a token, we want to load it in to the app
 	if tokenPath != "" {

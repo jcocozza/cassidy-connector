@@ -344,7 +344,7 @@ func (a *App) CreateSubscription() (int, *http.Server, *sync.WaitGroup, error) {
 	payload := map[string]string{
 		"client_id":     a.ClientId,
 		"client_secret": a.ClientSecret,
-		"callback_url":  a.AuthorizationCallbackDomain,
+		"callback_url":  fmt.Sprintf("%s%s", a.AuthorizationCallbackDomain, a.WebhookPath),
 		"verify_token":  a.WebhookVerifyToken,
 	}
 	jsonData, err := json.Marshal(payload)
@@ -407,7 +407,7 @@ func (a *App) LaunchWebhookServer() (*http.Server, *sync.WaitGroup, error) {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc(a.WebhookPath, a.webhookRedirectHandler)
-	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("alive")) })
+	mux.HandleFunc(fmt.Sprintf("%s/status", a.WebhookPath), func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("alive")) })
 	srv := &http.Server{Addr: hostWithPort, Handler: mux}
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
