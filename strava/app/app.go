@@ -401,21 +401,17 @@ func (a *App) CreateSubscription() (int, *http.Server, *sync.WaitGroup, error) {
 //   - the created server
 //   - a wait group. by calling wg.Wait() you keep the server running until it is explicitly stopped.
 func (a *App) LaunchWebhookServer() (*http.Server, *sync.WaitGroup, error) {
-	_, path, err := parseURL(a.AuthorizationCallbackDomain)
-	if err != nil {
-		return nil, nil, err
-	}
 	hostWithPort, _, err := parseURL(a.WebhookServerURL)
 	if err != nil {
 		return nil, nil, err
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("/"+path, a.webhookRedirectHandler)
+	mux.HandleFunc(a.WebhookPath, a.webhookRedirectHandler)
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("alive")) })
 	srv := &http.Server{Addr: hostWithPort, Handler: mux}
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	a.logger.Info("launching webhook server", slog.String("address", hostWithPort), slog.String("webhook path", path))
+	a.logger.Info("launching webhook server", slog.String("address", hostWithPort), slog.String("webhook path", a.WebhookPath))
 	go func() {
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			a.logger.Error("webhook server failed", slog.String("error", err.Error()))
