@@ -71,16 +71,22 @@ type App struct {
 	ClientId string
 	// Your Strava Application Client Secret
 	ClientSecret string
-	// The URL that strava will redirect an app user to once they allow your app to your application
-	//
-	// Strava will append ?code="" to this route.  this code is exchanged for an auth token to get user data
-	RedirectURL string
-	// note that this must be a publicly accessible url otherwise Strava cannot make the challenge request to it
-	//
-	// this must also be set in your strava application
+	// this must be set in your strava application
 	// see strava.com/settings/api then press edit.
 	// this should be the "Authorization Callback Domain"
+	//
+	// This url has 2 main purposes:
+	// 1. For onboarding users to your app; strava will send a callback to a route on this url
+	// 	it will be: <AuthorizationCallbackDomain>/strava/callback
+	// 2. For webhooks, handled by <AuthorizationCallbackDomain>/webhooks
+	//	note that this must be a publicly accessible url otherwise Strava cannot make the challenge request to it
 	AuthorizationCallbackDomain string
+	// The callback string will be appended to AuthorizationCallbackDomain
+	// it might look something like "/strava/callback"
+	CallbackPath string
+	// similar to CallbackPath, except for the webhook
+	// might look like "/strava/webhook"
+	WebhookPath string
 	// where you want the webserver to run for the webhooks e.g. http://localhost:8086
 	//
 	// Traffic from AuthorizationCallbackDomain should be routed to this server
@@ -97,9 +103,6 @@ type App struct {
 	SwaggerConfig *swagger.Configuration
 	// Contains the methods for interacting with the strava API
 	StravaClient *swagger.APIClient
-	// A way to get the authorization token from the intial authorization process
-	// Any calls to the stravaRedirectHandler will push the authorization code to the AuthorizationReciver channel.
-	AuthorizationReciever chan string
 	// this ensures that the webhook GET request from strava completes before we move forward
 	WebhookReciever chan string
 	// optional; a user defined function that tells the api how to handle new events
@@ -127,18 +130,19 @@ type App struct {
 }
 
 // Format the ApprovalUrlFormat
-func generateApprovalUrl(clientId string, redirectUrl string, scopes []string) string {
+func generateApprovalURL(clientID, authorizationCallbackDomain, callbackPath string, scopes []string) string {
 	scopeStr := strings.Join(scopes, ",")
-	return fmt.Sprintf(approvalUrlFormat, clientId, responseType, redirectUrl, approvalPrompt, scopeStr)
+	redirectURL := fmt.Sprintf("%s%s", authorizationCallbackDomain, callbackPath)
+	return fmt.Sprintf(approvalUrlFormat, clientID, responseType, redirectURL, approvalPrompt, scopeStr)
 }
 
-// note that authorizationCallbackDomain, webhookServerURL, and webhookVerifyToken can be empty strings if you aren't interested in webhooks
-func NewApp(clientId string, clientSecret, redirectURL string, authorizationCallbackDomain string, webhookServerURL string, webhookVerifyToken string, webhookEventHandler func(StravaEvent), scopes []string, logger *slog.Logger) *App {
-	approvalUrl := generateApprovalUrl(clientId, redirectURL, scopes)
+// note that webhookServerURL, and webhookVerifyToken can be empty strings if you aren't interested in webhooks
+func NewApp(clientId string, clientSecret, authorizationCallbackDomain string, callbackPath string, webhookPath string, webhookServerURL string, webhookVerifyToken string, webhookEventHandler func(StravaEvent), scopes []string, logger *slog.Logger) *App {
+	approvalUrl := generateApprovalURL(clientId, authorizationCallbackDomain, callbackPath, scopes)
 	oauthCfg := &oauth2.Config{
 		ClientID:     clientId,
 		ClientSecret: clientSecret,
-		RedirectURL:  redirectURL,
+		RedirectURL:  fmt.Sprintf("%s%s", authorizationCallbackDomain, callbackPath),
 		Scopes:       scopes,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  approvalUrl,
@@ -147,7 +151,6 @@ func NewApp(clientId string, clientSecret, redirectURL string, authorizationCall
 	}
 	cfg := swagger.NewConfiguration()
 	client := swagger.NewAPIClient(cfg)
-	reciever := make(chan string)
 	webhookReciever := make(chan string, 1)
 	if logger == nil {
 		logger = NoopLogger()
@@ -157,8 +160,9 @@ func NewApp(clientId string, clientSecret, redirectURL string, authorizationCall
 		logger:                      logger,
 		ClientId:                    clientId,
 		ClientSecret:                clientSecret,
-		RedirectURL:                 redirectURL,
 		AuthorizationCallbackDomain: authorizationCallbackDomain,
+		CallbackPath:                callbackPath,
+		WebhookPath:                 webhookPath,
 		WebhookServerURL:            webhookServerURL,
 		WebhookVerifyToken:          webhookVerifyToken,
 		WebhookReciever:             webhookReciever,
@@ -168,15 +172,14 @@ func NewApp(clientId string, clientSecret, redirectURL string, authorizationCall
 		OAuthConfig:                 oauthCfg,
 		StravaClient:                client,
 		Api:                         api.NewStravaAPI(client, oauthCfg, logger.WithGroup("api")),
-		AuthorizationReciever:       reciever,
 	}
 }
 
 // Return the approval url
 func (a *App) ApprovalUrl() string {
-	scopeStr := strings.Join(a.Scopes, ",")
-	a.logger.Debug("generating approval url", slog.Any("scope string", scopeStr))
-	return fmt.Sprintf(approvalUrlFormat, a.ClientId, responseType, a.RedirectURL, approvalPrompt, scopeStr)
+	url := generateApprovalURL(a.ClientId, a.AuthorizationCallbackDomain, a.CallbackPath, a.Scopes)
+	a.logger.Debug("generating approval url", slog.Any("url", url))
+	return url
 }
 
 // This is for the FIRST TIME getting the access token.

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"log/slog"
+
 	"github.com/jcocozza/cassidy-connector/strava/app"
 	"golang.org/x/oauth2"
 )
@@ -12,13 +14,15 @@ func createApp() (*app.App, *oauth2.Token, error) {
 	stravaApp := app.NewApp(
 		clientId,
 		clientSecret,
-		redirectURL,
 		authorizationCallbackDomain,
+		callbackPath,
+		webhookPath,
 		webhookServerURL,
 		webhookVerifyToken,
 		nil,
 		scopes,
-		nil,// no logger for the cli
+		//nil,// no logger for the cli
+		slog.Default(),
 	)
 	// when we have a token, we want to load it in to the app
 	if tokenPath != "" {
