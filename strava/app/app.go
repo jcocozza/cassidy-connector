@@ -66,10 +66,15 @@ type StravaEvent struct {
 //     The swagger methods/api calls are wrapped by the custom functions that allow for a layer of abstration to simplify interaction with the strava api.
 //     This is all found the the `Api` field of the `App` struct
 type App struct {
-	logger       *slog.Logger
-	ClientId     string
+	logger *slog.Logger
+	// Your Strava Application Client ID
+	ClientId string
+	// Your Strava Application Client Secret
 	ClientSecret string
-	RedirectURL  string
+	// The URL that strava will redirect an app user to once they allow your app to your application
+	//
+	// Strava will append ?code="" to this route.  this code is exchanged for an auth token to get user data
+	RedirectURL string
 	// note that this must be a publicly accessible url otherwise Strava cannot make the challenge request to it
 	//
 	// this must also be set in your strava application
@@ -214,24 +219,6 @@ func (a *App) ReadTokenFromFile(tokenFilePath string) (*oauth2.Token, error) {
 	return &token, nil
 }
 
-// Get the authorization code form the url that results from the redirect.
-// This is written to the AuthorizationReciever channel.
-//
-// If there is an error (e.g. the user denies access permission), write the error to the AuthorizationReciver channel with an "error:" prefix.
-func (a *App) stravaRedirectHandler(w http.ResponseWriter, r *http.Request) {
-	a.logger.Debug("strava redirect handler called")
-	// Extract URL parameters here and handle them accordingly
-	code := r.URL.Query().Get("code") // Assuming 'code' is the parameter sent by Strava
-	err := r.URL.Query().Get("error") // if the user denies, the url will send an error "access_denied"
-	if code != "" {
-		a.logger.Debug("sending code to authorization reciever")
-		a.AuthorizationReciever <- code
-	} else if err != "" {
-		a.logger.Warn("sending error to authorization reciever", slog.String("error", err))
-		a.AuthorizationReciever <- "error:" + err
-	}
-}
-
 // Parse a url into its "address:port" and its "url/path"
 //
 // e.g. http://localhost:9999/strava/callback -> "localhost:9999", "strava/callback", err
@@ -250,114 +237,19 @@ func parseURL(inputURL string) (string, string, error) {
 	}
 }
 
-// Listen to the redirect route. Once the user is directed to it, we can extract the token from the url.
-//
-// Returns the Http server instance, so it can be shutdown when you like.
-func (a *App) StartStravaHttpServer() (*http.Server, error) {
-	hostWithPort, path, err := parseURL(a.RedirectURL)
-	if err != nil {
-		return nil, err
-	}
-	mux := http.NewServeMux()
-	srv := &http.Server{Addr: hostWithPort, Handler: mux}
-	mux.HandleFunc("/"+path, a.stravaRedirectHandler)
-	a.logger.Info("starting strava http server", slog.String("address", hostWithPort))
-	go func() {
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			a.logger.Error("strava http server failed", slog.String("error", err.Error()))
-		}
-	}()
-	return srv, nil
-}
-
-// Run this function when you send the user to strava's authorization site.
-//
-// `timeoutDuration` is the time in seconds wait before returning nothing. Use -1 for no timeout duration.
-// If the duration is exceeded throws an error.
-//
-// It will start an http listener that listens on the redirect route provided by your app.
-// Once the user authorizes the app and is redirected, the http ListenAndServe will detect the authorization code and push it to the AuthorizationReciever channel.
-// Finally, the GetAccessTokenFromAuthorizationCode will set the app's token.
-//
-// From there, you can persist the token in whatever way you please for further access.
-//
-// For lower level control over this process, you can start the HttpListener, await the code in the channel and get the access token separately:
-/*
-	server, err := a.StartStravaHttpServer()
-	if err != nil {
-		return nil, err
-	}
-	code := <-s.App.AuthorizationReciever
-	fmt.Println("GOT CODE:" + code)
-	err := s.App.GetAccessTokenFromAuthorizationCode(context.TODO(), code)
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-*/
-//
-func (a *App) AwaitInitialToken(timeoutDuration int) (*oauth2.Token, error) {
-	// TODO: allow the context to be passed in
-	ctx := context.TODO()
-	a.logger.DebugContext(ctx, "awaiting initial token", slog.Int("timeout duration", timeoutDuration))
-	// start listening in a separate go routine
-	server, err := a.StartStravaHttpServer()
-	if err != nil {
-		return nil, err
-	}
-	if timeoutDuration == -1 {
-		code := <-a.AuthorizationReciever
-		if strings.Contains(code, "error") {
-			server.Shutdown(ctx)
-			return nil, fmt.Errorf(code)
-		}
-		token, err := a.GetAccessTokenFromAuthorizationCode(ctx, code)
-		if err != nil {
-			a.logger.WarnContext(ctx, "failed to get token, shutting down server")
-			server.Shutdown(ctx)
-			return nil, err
-		}
-		a.logger.InfoContext(ctx, "got token, shutting down server")
-		server.Shutdown(ctx)
-		return token, nil
-	} else {
-		select {
-		case code := <-a.AuthorizationReciever:
-			if strings.Contains(code, "error") {
-				server.Shutdown(ctx)
-				return nil, fmt.Errorf(code)
-			}
-			// recieved token
-			token, err := a.GetAccessTokenFromAuthorizationCode(ctx, code)
-			if err != nil {
-				a.logger.WarnContext(ctx, "failed to get token, shutting down server")
-				server.Shutdown(ctx)
-				return nil, err
-			}
-			server.Shutdown(ctx)
-			return token, nil
-		case <-time.After(time.Duration(timeoutDuration) * time.Second):
-			// didn't recieve token in time
-			a.logger.WarnContext(ctx, "hit timeout, failed to get token, shutting down server")
-			server.Shutdown(ctx)
-			return nil, fmt.Errorf("exceeded timeout duration")
-		}
-	}
-}
-
 // Open the Approval Url in the users browser
-func (a *App) OpenAuthorizationGrant() {
+func (a *App) OpenAuthorizationGrant() error {
 	url := a.ApprovalUrl()
 	a.logger.Debug("opening authorization grant", slog.String("url", url))
-	utils.OpenURL(url)
+	return utils.OpenURL(url)
 }
 
 // Open the strava settings page
 //
 // This idea is to make it easy for the users to deauthenticate/revoke access to the app whenever they like.
-func (a *App) OpenStravaAppSettings() {
+func (a *App) OpenStravaAppSettings() error {
 	a.logger.Debug("opening strava app settings", slog.String("url", stravaAppSettings))
-	utils.OpenURL(stravaAppSettings)
+	return utils.OpenURL(stravaAppSettings)
 }
 
 // this handler does a great deal of work
@@ -476,7 +368,7 @@ func (a *App) CreateSubscription() (int, *http.Server, *sync.WaitGroup, error) {
 	// wait for the webhook verification challege to complete
 	// once this happens, strava has confirmed the webhook, so we are now expecting the response
 	a.logger.Debug("awaiting challenge")
-	_ = <-a.WebhookReciever
+	<-a.WebhookReciever
 	a.logger.Debug("got challenge")
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
