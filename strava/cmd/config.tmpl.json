@@ -1,9 +1,10 @@
 {
     "client_id": "",
     "client_secret": "",
-    "redirect_url": "",
+    "authorization_callback_domain": "",
+    "callback_path": "",
+    "webhook_path": ""
     "scopes": [""],
     "token_path": "",
-    "authorization_callback_domain": "",
     "webhook_server_url": ""
 }

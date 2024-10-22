@@ -17,8 +17,9 @@ const (
 type cfg struct {
 	ClientId                    string   `json:"client_id"`
 	ClientSecret                string   `json:"client_secret"`
-	RedirectURL                 string   `json:"redirect_url"`
 	AuthorizationCallbackDomain string   `json:"authorization_callback_domain"`
+	CallbackPath				string 	 `json:"callback_path"`
+	WebhookPath                 string 	 `json:"webhook_path"`
 	WebhookServerURL            string   `json:"webhook_server_url"`
 	WebhookVerifyToken          string   `json:"webhook_verify_token"`
 	Scopes                      []string `json:"scopes"`
@@ -33,6 +34,8 @@ var clientId string
 var clientSecret string
 var redirectURL string
 var authorizationCallbackDomain string
+var callbackPath string
+var webhookPath string
 var webhookServerURL string
 var webhookVerifyToken string
 var scopes []string
@@ -88,11 +91,14 @@ func initConfig() {
 	if config.ClientSecret != "" {
 		RootCmd.Flags().Set("client-secret", config.ClientSecret)
 	}
-	if config.RedirectURL != "" {
-		RootCmd.Flags().Set("redirect-url", config.RedirectURL)
-	}
 	if config.AuthorizationCallbackDomain != "" {
 		RootCmd.Flags().Set("auth-callback-domain", config.AuthorizationCallbackDomain)
+	}
+	if config.CallbackPath != "" {
+		RootCmd.Flags().Set("callback-path", config.CallbackPath)
+	}
+	if config.WebhookPath != "" {
+		RootCmd.Flags().Set("webhook-path", config.WebhookPath)
 	}
 	if config.WebhookServerURL != "" {
 		RootCmd.Flags().Set("webhook-server-url", config.WebhookServerURL)
@@ -114,8 +120,9 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&configPath, "config", "", fmt.Sprintf("the config file of the application. see config.tmpl.json for format. a config is NOT required if you want to pass everything manually. (default is $HOME/%s)", defaultConfig))
 	RootCmd.PersistentFlags().StringVar(&clientId, "client-id", "", "the client id of your strava application")
 	RootCmd.PersistentFlags().StringVar(&clientSecret, "client-secret", "", "the client secret of your strava application")
-	RootCmd.PersistentFlags().StringVar(&redirectURL, "redirect-url", "http://localhost/exchange_token", "the redirect url of your strava application")
 	RootCmd.PersistentFlags().StringVar(&authorizationCallbackDomain, "auth-callback-domain", "", "the redirect url for the webhook. MUST be exposed to the internet and all traffic from here must be routed to webhook-server-url")
+	RootCmd.PersistentFlags().StringVar(&callbackPath, "callback-path", "/strava/callback", "the path off the authorization callback domain for the auth callback")
+	RootCmd.PersistentFlags().StringVar(&webhookPath, "webhook-path", "/webhook", "the path off the authorization callback domain for the webhook")
 	RootCmd.PersistentFlags().StringVar(&webhookServerURL, "webhook-server-url", "http://localhost:8086", "where the webhook server will run from")
 	RootCmd.PersistentFlags().StringVar(&webhookVerifyToken, "webhook-verify-token", "STRAVA", "the verification token for the webook just an arbritary token for verifying your app is receiving the correct webhook responses")
 	RootCmd.PersistentFlags().StringSliceVar(&scopes, "scopes", []string{"activity:read_all"}, "the scope requirement of your strava application")
